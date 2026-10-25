@@ -2281,8 +2281,6 @@ kbd {
 }
 /* The book shown in the detail panel lifts off the shelf. */
 .book-card[data-active="true"] .book-cover {
-  outline: 2px solid var(--primary);
-  outline-offset: 3px;
   transform: translateY(-10px);
   box-shadow:
     var(--cover-shadow-lifted),
