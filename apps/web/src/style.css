@@ -2299,7 +2299,11 @@ kbd {
 .book-cover > .book-cover-image[data-loaded="true"] {
   opacity: 1;
 }
-/* A real cover replaces the drawn title page. */
+/* A real cover replaces the drawn title page, including the placeholder
+   colour that would otherwise show through the button's transparent border. */
+.book-cover:has(> .book-cover-image[data-loaded="true"]) {
+  background: transparent;
+}
 .book-cover:has(> .book-cover-image[data-loaded="true"])
   > :not(.book-cover-image) {
   visibility: hidden;
