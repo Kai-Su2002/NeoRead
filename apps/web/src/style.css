@@ -2264,6 +2264,85 @@ kbd {
   outline: 2px solid var(--ring);
   outline-offset: 5px;
 }
+.book-card[data-active="true"] .book-cover {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+/* The book library scrolls its list beside a fixed detail panel. */
+.book-library {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.book-library > .library-topbar {
+  flex-shrink: 0;
+}
+.book-library-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.book-list-pane {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+.book-cover > .book-cover-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.book-cover > .book-cover-image[data-loaded="true"] {
+  opacity: 1;
+}
+/* A real cover replaces the drawn title page. */
+.book-cover:has(> .book-cover-image[data-loaded="true"])
+  > :not(.book-cover-image) {
+  visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .book-cover > .book-cover-image {
+    transition: none;
+  }
+}
+.book-detail-cover:not(:has(> .book-cover-image[data-loaded="true"])) {
+  display: none;
+}
+.book-detail-cover {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+.book-detail-cover > .book-cover-image {
+  max-width: 150px;
+  max-height: 220px;
+  border-radius: 6px;
+  box-shadow:
+    0 4px 14px rgb(0 0 0 / 12%),
+    0 0 0 1px color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+/* Star, edit and more share the row equally. */
+.book-detail-actions.book-detail-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.book-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+.book-rating {
+  display: flex;
+  padding: 2px 0;
+}
+.book-rating [data-slot="button"] {
+  color: var(--muted-foreground);
+}
 .book-select {
   position: absolute;
   z-index: 2;
