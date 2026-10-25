@@ -371,7 +371,7 @@ kbd {
   --cover-shadow: 0 1px 3px rgb(0 0 0 / 8%), 0 6px 16px rgb(0 0 0 / 11%);
   --cover-shadow-hover: 0 2px 5px rgb(0 0 0 / 9%), 0 10px 24px rgb(0 0 0 / 15%);
   --cover-shadow-lifted:
-    0 4px 10px rgb(0 0 0 / 10%), 0 18px 36px rgb(0 0 0 / 20%);
+    0 8px 14px rgb(0 0 0 / 12%), 0 26px 46px rgb(0 0 0 / 24%);
   box-shadow:
     var(--cover-shadow),
     inset 5px 0 0 #ffffff23;
@@ -384,7 +384,7 @@ kbd {
   --cover-shadow-hover:
     0 2px 5px rgb(0 0 0 / 32%), 0 10px 24px rgb(0 0 0 / 40%);
   --cover-shadow-lifted:
-    0 4px 10px rgb(0 0 0 / 34%), 0 18px 36px rgb(0 0 0 / 48%);
+    0 8px 14px rgb(0 0 0 / 38%), 0 26px 46px rgb(0 0 0 / 55%);
 }
 @media (hover: hover) and (pointer: fine) {
   .book-cover:hover {
@@ -2283,7 +2283,7 @@ kbd {
 .book-card[data-active="true"] .book-cover {
   outline: 2px solid var(--primary);
   outline-offset: 3px;
-  transform: translateY(-6px);
+  transform: translateY(-10px);
   box-shadow:
     var(--cover-shadow-lifted),
     inset 5px 0 0 #ffffff23;
