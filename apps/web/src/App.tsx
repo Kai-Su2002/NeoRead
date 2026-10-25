@@ -75,6 +75,11 @@ import { filterDocuments, initialFilters } from "./library";
 import { GuideHost } from "./guide/GuideHost";
 const currentMode = () =>
   libraryMode(useReaderStore.getState().libraryPreferences);
+/** Whether a press landed on library space rather than a book or control. */
+const onEmptyLibrary = (target: EventTarget) =>
+  !(target as Element).closest(
+    '.book-card, .book-detail, button, a, input, textarea, select, label, [role="button"], [role="separator"], [role="menu"], [role="dialog"]',
+  );
 export function App() {
   const {
     documents: allDocuments,
@@ -105,6 +110,7 @@ export function App() {
   const [editingLibrary, setEditingLibrary] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const pressedEmpty = useRef(false);
   const [overviewDocument, setOverviewDocument] = useState<Document | null>(
     null,
   );
@@ -620,15 +626,20 @@ export function App() {
               <main
                 className="library-main book-library"
                 onPointerDown={(e) => {
-                  // Pressing on empty library space closes the detail panel.
+                  pressedEmpty.current =
+                    e.button === 0 && onEmptyLibrary(e.target);
+                }}
+                onClick={(e) => {
+                  // Clicking empty library space closes the detail panel. It
+                  // waits for the click so a field being edited saves on blur
+                  // first, and ignores drags that began inside the panel.
                   if (
                     detailId &&
-                    e.button === 0 &&
-                    !(e.target as Element).closest(
-                      '.book-card, .book-detail, button, a, input, textarea, select, label, [role="button"], [role="separator"], [role="menu"], [role="dialog"]',
-                    )
+                    pressedEmpty.current &&
+                    onEmptyLibrary(e.target)
                   )
                     setDetailId(null);
+                  pressedEmpty.current = false;
                 }}
               >
                 <header className="library-topbar">
