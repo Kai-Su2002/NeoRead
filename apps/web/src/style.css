@@ -388,6 +388,7 @@ kbd {
 }
 @media (hover: hover) and (pointer: fine) {
   .book-cover:hover {
+    transform: translateY(-6px);
     box-shadow:
       var(--cover-shadow-hover),
       inset 5px 0 0 #ffffff23;
@@ -2290,6 +2291,7 @@ kbd {
   .book-cover {
     transition: none;
   }
+  .book-cover:hover,
   .book-card[data-active="true"] .book-cover {
     transform: none;
   }
