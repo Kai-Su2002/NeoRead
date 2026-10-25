@@ -66,7 +66,7 @@ import { useResolvedTheme } from "./appearance";
 import { DocumentEditor, LibraryFilterBar } from "./DocumentManagement";
 import { TagBoards } from "./TagBoards";
 import { LibraryDocuments } from "./LibraryDocuments";
-import { BookDetail } from "./BookDetail";
+import { ResizableBookDetail } from "./BookDetail";
 import type { BookMenuActions } from "./BookMenu";
 import { DocumentOverviewDialog } from "./DocumentOverview";
 import { ProcessingUsageDialog } from "./ProcessingUsage";
@@ -625,7 +625,7 @@ export function App() {
                     detailId &&
                     e.button === 0 &&
                     !(e.target as Element).closest(
-                      '.book-card, .book-detail, button, a, input, textarea, select, label, [role="button"], [role="menu"], [role="dialog"]',
+                      '.book-card, .book-detail, button, a, input, textarea, select, label, [role="button"], [role="separator"], [role="menu"], [role="dialog"]',
                     )
                   )
                     setDetailId(null);
@@ -804,7 +804,7 @@ export function App() {
                     </div>
                   </div>
                   {detail && (
-                    <BookDetail
+                    <ResizableBookDetail
                       key={detail.id}
                       doc={detail}
                       actions={bookActions}

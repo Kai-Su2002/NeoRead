@@ -225,6 +225,10 @@ export interface LibraryPreferences {
   primaryMode?: LibraryMode;
   mode?: LibraryMode;
   papers?: PaperLibraryPreferences;
+  books?: {
+    /** Width of the book detail panel in CSS pixels. */
+    detailWidth?: number;
+  };
 }
 /** First-run guide and release notes, stored with the library. */
 export interface GuidePreferences {

@@ -10,12 +10,14 @@ const mocks = vi.hoisted(() => ({
   saveCover: vi.fn(),
   getDocument: vi.fn(),
   render: vi.fn(),
+  savePreferences: vi.fn(),
 }));
 vi.mock("@neoread/api", () => ({
   api: {
     update: mocks.update,
     documents: mocks.documents,
     saveCover: mocks.saveCover,
+    saveLibraryPreferences: mocks.savePreferences,
   },
   coverURL: (id: string, revision?: number) =>
     `/cover/${id}${revision ? "?v" : ""}`,
@@ -29,7 +31,7 @@ vi.mock("pdfjs-dist", () => ({
 }));
 vi.mock("./diagnostics", () => ({ reportDiagnostic: vi.fn() }));
 
-import { BookDetail } from "./BookDetail";
+import { BookDetail, ResizableBookDetail } from "./BookDetail";
 import { BookCoverImage } from "./book-cover";
 import { useReaderStore } from "./store";
 
@@ -201,4 +203,42 @@ it("renders and stores the first page of a PDF without a cover", async () => {
   const images = host.querySelectorAll("img");
   expect(images).toHaveLength(2);
   for (const img of images) expect(img.getAttribute("src")).toBe("/cover/p1?v");
+});
+
+it("resizes the detail panel and keeps the width", async () => {
+  const doc = book();
+  mocks.savePreferences.mockResolvedValue({});
+  useReaderStore.setState({
+    documents: [doc],
+    libraryPreferences: { books: { detailWidth: 400 } },
+  });
+  await act(async () =>
+    root.render(
+      <ResizableBookDetail
+        doc={doc}
+        actions={actions}
+        open={() => {}}
+        favorite={() => {}}
+      />,
+    ),
+  );
+  const handle = host.querySelector<HTMLElement>('[role="separator"]')!;
+  const panel = host.querySelector<HTMLElement>(".book-detail")!;
+  expect(handle.getAttribute("aria-valuenow")).toBe("400");
+  expect(panel.style.getPropertyValue("--paper-detail-width")).toBe("400px");
+  vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
+    width: 400,
+  } as DOMRect);
+  await act(async () =>
+    handle.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
+    ),
+  );
+  expect(useReaderStore.getState().libraryPreferences.books).toEqual({
+    detailWidth: 416,
+  });
+  expect(mocks.savePreferences).toHaveBeenCalledWith(
+    expect.objectContaining({ books: { detailWidth: 416 } }),
+  );
+  expect(panel.style.getPropertyValue("--paper-detail-width")).toBe("416px");
 });
