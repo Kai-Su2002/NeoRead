@@ -26,12 +26,6 @@ export function useTranslations(documentId: string, hrefs?: string[]) {
             setError("");
             if (event.event === "snapshot") setTranslations(event.data);
             else {
-              if (event.data.status === "complete")
-                window.dispatchEvent(
-                  new CustomEvent("neoread:annotations-changed", {
-                    detail: { documentId },
-                  }),
-                );
               setTranslations((current) => {
                 const index = current.findIndex(
                   (b) => b.blockId === event.data.blockId,

@@ -1,3 +1,4 @@
+import { consumeAnnotationStream } from "./annotation-stream";
 import { diagnosticFetch, reportDiagnostic } from "./diagnostics";
 import {
   uploadAttachment,
@@ -320,6 +321,29 @@ export const api = {
       body: JSON.stringify({ text: selection.text, ...selection.context }),
       signal,
     }),
+  annotationStream: async (
+    id: string,
+    signal: AbortSignal,
+    onRevision: (revision: string) => void,
+  ) => {
+    const response = await diagnosticFetch(
+      `/api/documents/${encodeURIComponent(id)}/annotations/stream`,
+      {
+        headers: {
+          Authorization: `Bearer ${sessionToken}`,
+          Accept: "text/event-stream",
+        },
+        signal,
+      },
+    );
+    if (
+      !response.ok ||
+      !response.body ||
+      !response.headers.get("content-type")?.startsWith("text/event-stream")
+    )
+      throw new Error(`无法订阅批注 (${response.status})`);
+    return consumeAnnotationStream(response.body, signal, onRevision);
+  },
   translationStream: async (
     id: string,
     signal: AbortSignal,
@@ -606,8 +630,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ force }),
     }),
-  annotations: (id: string) =>
-    request<Annotation[]>(`/api/documents/${id}/annotations`),
+  annotations: (id: string, signal?: AbortSignal) =>
+    request<Annotation[]>(`/api/documents/${id}/annotations`, { signal }),
   annotate: (
     id: string,
     annotation: Pick<

@@ -1,3 +1,4 @@
+import { useAnnotationUpdates } from "./useAnnotationUpdates";
 import { webSearchEnabled } from "./chat/web-search";
 import { NavigationTree } from "./NavigationTree";
 import { useShortcut } from "./shortcuts/shortcuts";
@@ -481,30 +482,17 @@ export function Workspace({
     setSearchedQuery("");
     setSearching(false);
   }, [doc.id]);
-  useEffect(() => {
-    let alive = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const refresh = (event: Event) => {
-      const documentId = (event as CustomEvent<{ documentId: string }>).detail
-        ?.documentId;
-      if (documentId && documentId !== doc.id) return;
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        void api
-          .annotations(doc.id)
-          .then((items) => {
-            if (alive) setAnnotations(items);
-          })
-          .catch((e) => toast.error(e.message));
-      }, 50);
-    };
-    window.addEventListener("neoread:annotations-changed", refresh);
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-      window.removeEventListener("neoread:annotations-changed", refresh);
-    };
-  }, [doc.id]);
+  useAnnotationUpdates(
+    doc.id,
+    (items) => {
+      setAnnotations(items);
+      setAnnotationsLoaded(true);
+    },
+    () => {
+      setAnnotations([]);
+      setAnnotationsLoaded(false);
+    },
+  );
   useShortcut("readerLeft", () => setLeft(!left));
   useShortcut("readerRight", () => setRight(!right));
   useShortcut("search", () => {
@@ -513,22 +501,11 @@ export function Workspace({
     requestAnimationFrame(() => searchInput.current?.focus());
   });
   useEffect(() => {
-    let alive = true;
     session.activate();
     abort.current = null;
     if (currentSession) void session.load();
     setSending(false);
-    api
-      .annotations(doc.id)
-      .then((a) => {
-        if (alive) {
-          setAnnotations(a);
-          setAnnotationsLoaded(true);
-        }
-      })
-      .catch((e) => toast.error(e.message));
     return () => {
-      alive = false;
       sendSerial.current++;
       abort.current?.abort();
       // A viewer switch must not abort its independently owned run.

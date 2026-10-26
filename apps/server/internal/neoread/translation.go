@@ -198,6 +198,7 @@ func (s *Server) saveTranslation(documentID string, t TranslationBlock, source .
 		return err
 	}
 	if changed > 0 {
+		s.publishAnnotationChange(documentID)
 		s.diagnosticEvent(slog.LevelInfo, "annotation.retranslation.reconcile", "documentId", documentID, "count", changed)
 	}
 	s.publishTranslation(documentID, visible)

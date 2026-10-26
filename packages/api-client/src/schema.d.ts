@@ -533,6 +533,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/{id}/annotations/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscribe to committed annotation recovery/migration revisions, independently of chapter subscriptions */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description SSE revision events with a JSON string token, initially and after committed changes. The client reloads saved annotations only when the token changes, including reconnects. No source parsing or recovery is triggered. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+                /** @description Document not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{id}/annotations/recover": {
         parameters: {
             query?: never;

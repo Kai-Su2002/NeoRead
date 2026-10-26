@@ -287,5 +287,8 @@ func (s *Server) migrateLegacyDocument(ctx context.Context, document string) (in
 	if err := tx.Commit(); err != nil {
 		return 0, 0, err
 	}
+	if migrated > 0 {
+		s.publishAnnotationChange(document)
+	}
 	return migrated, skipped, nil
 }

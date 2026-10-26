@@ -39,7 +39,7 @@ it("migrates only on click, prevents repeated requests, and reports partial resu
       "已迁移 2 条旧版批注，1 项暂未迁移",
     );
     expect(host.textContent).toContain("1 个文档迁移失败");
-    expect(changed).toHaveBeenCalledTimes(1);
+    expect(changed).not.toHaveBeenCalled();
     vi.mocked(api.migrateLegacyAnnotations).mockRejectedValueOnce(
       new Error("offline"),
     );

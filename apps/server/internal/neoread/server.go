@@ -43,6 +43,8 @@ type Server struct {
 	endnoteScans           map[string]*endnoteScan
 	annotationCheckLocks   sync.Map
 	annotationMu           sync.Mutex
+	annotationRevisions    map[string]string
+	annotationSubscribers  map[string]map[chan struct{}]struct{}
 	annotationHistory      []annotationChange
 	codexChat              codexChatCache
 	documentCodex          documentCodexCache
@@ -178,6 +180,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/documents/{id}/classification", s.retryClassification)
 	mux.HandleFunc("POST /api/documents/{id}/annotations/undo", s.undoAnnotation)
 	mux.HandleFunc("GET /api/documents/{id}/annotations", s.annotations)
+	mux.HandleFunc("GET /api/documents/{id}/annotations/stream", s.streamAnnotationChanges)
 	mux.HandleFunc("POST /api/documents/{id}/annotations/recover", s.recoverAnnotations)
 	mux.HandleFunc("POST /api/annotations/migrate-legacy", s.migrateLegacyAnnotations)
 	mux.HandleFunc("POST /api/documents/{id}/annotations", s.recordAnnotation(s.saveAnnotation))

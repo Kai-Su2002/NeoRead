@@ -544,6 +544,35 @@
                 },
             },
         },
+      "/api/documents/{id}/annotations/stream":
+        {
+          "get":
+            {
+              "summary": "Subscribe to committed annotation recovery/migration revisions, independently of chapter subscriptions",
+              "parameters":
+                [
+                  {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": { "type": "string" },
+                  },
+                ],
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "SSE revision events with a JSON string token, initially and after committed changes. The client reloads saved annotations only when the token changes, including reconnects. No source parsing or recovery is triggered.",
+                      "content":
+                        {
+                          "text/event-stream":
+                            { "schema": { "type": "string" } },
+                        },
+                    },
+                  "404": { "description": "Document not found" },
+                },
+            },
+        },
       "/api/documents/{id}/annotations/recover":
         {
           "post":

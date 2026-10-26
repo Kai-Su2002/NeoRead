@@ -22,8 +22,6 @@ export function LegacyAnnotationMigration() {
             setNotice(
               `已迁移 ${result.migrated} 条旧版批注${result.skipped ? `，${result.skipped} 项暂未迁移，可在翻译完成后重试` : ""}${result.failed ? `，${result.failed} 个文档迁移失败，请查看诊断日志后重试` : ""}。`,
             );
-            if (result.migrated)
-              window.dispatchEvent(new Event("neoread:annotations-changed"));
           } catch {
             setNotice("旧版批注迁移未完成，请重试。已保存的批注会保留。");
           } finally {

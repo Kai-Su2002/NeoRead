@@ -6,7 +6,7 @@ import { api } from "@neoread/api";
 import { useTranslations } from "./useTranslations";
 vi.mock("@neoread/api", () => ({ api: { translationStream: vi.fn() } }));
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
-it("refreshes annotations after a completed streamed translation, never from the opening snapshot", async () => {
+it("does not drive annotation refresh from chapter snapshots or translation events", async () => {
   let receive!: Parameters<typeof api.translationStream>[2];
   vi.mocked(api.translationStream).mockImplementation(
     async (_id, signal, callback) => {
@@ -34,10 +34,7 @@ it("refreshes annotations after a completed streamed translation, never from the
     await act(async () => receive({ event: "snapshot", data: [data] }));
     expect(changed).not.toHaveBeenCalled();
     await act(async () => receive({ event: "translation", data }));
-    expect(changed).toHaveBeenCalledTimes(1);
-    expect((changed.mock.calls[0][0] as CustomEvent).detail.documentId).toBe(
-      "doc",
-    );
+    expect(changed).not.toHaveBeenCalled();
   } finally {
     await act(async () => root.unmount());
     window.removeEventListener("neoread:annotations-changed", changed);
