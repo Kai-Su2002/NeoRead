@@ -319,7 +319,9 @@ export function LibraryDocuments({
                 !jobs.some(
                   (j) =>
                     j.documentId === doc.id &&
-                    (j.status === "running" || j.status === "queued"),
+                    (j.status === "running" ||
+                      j.status === "queued" ||
+                      (!!j.bookLayout && j.bookLayout.status !== "complete")),
                 ) ? (
                   <CoverOverview
                     job={overviewJobs.find((o) => o.documentId === doc.id)!}
