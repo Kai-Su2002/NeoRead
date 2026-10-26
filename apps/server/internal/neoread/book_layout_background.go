@@ -140,7 +140,9 @@ func (s *Server) runBookLayoutBatch(ctx context.Context, documentID string) {
 		cancel()
 	}()
 	_, _ = s.Store.DB.Exec("UPDATE book_layout_jobs SET status='running' WHERE document_id=?", documentID)
-	progress, err := s.parseBookBatch(run, documentID)
+	started := time.Now()
+	batch := bookLayoutBatch{}
+	progress, err := s.parseBookBatch(run, documentID, &batch)
 	status := "queued"
 	switch {
 	case err == nil && progress.PagesDone >= progress.PagesTotal && progress.PagesTotal > 0:
@@ -150,22 +152,64 @@ func (s *Server) runBookLayoutBatch(ctx context.Context, documentID string) {
 		_ = s.Store.queueDocumentCorpus(documentID)
 	case err != nil && run.Err() == nil:
 		status = "failed"
-		s.diagnosticEvent(slog.LevelWarn, "book.layout.failed", "documentId", documentID, "errorCode", errorKind(err))
+	}
+	// One terminal event per batch names the book, the chapter and its pages,
+	// and the step that failed; pdf.parse.finish with the same pages carries
+	// the worker's exit details.
+	level, outcome, phase, reason, code := slog.LevelInfo, "complete", "", "", ""
+	if err != nil {
+		outcome = "canceled"
+		var failure *bookLayoutError
+		if errors.As(err, &failure) {
+			phase, reason, code = failure.phase, failure.reason, failure.code
+		}
+		if status == "failed" {
+			level, outcome = slog.LevelError, "failed"
+		}
+	}
+	if batch.From > 0 || err != nil {
+		s.diagnosticEvent(level, "book.layout.batch", "documentId", documentID, "outcome", outcome,
+			"jobStatus", status, "phase", phase, "reasonCode", reason, "errorCode", code,
+			"fromPage", batch.From, "toPage", batch.To, "chapter", batch.Chapter,
+			"chapterStartPage", batch.ChapterStart, "chapters", batch.Chapters,
+			"pagesDone", progress.PagesDone, "pagesTotal", progress.PagesTotal,
+			"durationMs", time.Since(started).Milliseconds())
 	}
 	_, _ = s.Store.DB.Exec("UPDATE book_layout_jobs SET status=?,pages_done=?,pages_total=? WHERE document_id=?",
 		status, progress.PagesDone, progress.PagesTotal, documentID)
 }
 
+// bookLayoutBatch locates a background batch for diagnostics: its pages and
+// the outline chapter they start in. Chapter is 1-based and 0 without an
+// outline; titles stay out of the logs.
+type bookLayoutBatch struct {
+	From, To, Chapter, ChapterStart, Chapters int
+}
+
+// bookLayoutError names the step of a batch that failed with a stable reason;
+// the wrapped error is never logged because it may carry paths or text.
+type bookLayoutError struct {
+	phase, reason, code string
+	err                 error
+}
+
+func (e *bookLayoutError) Error() string { return e.err.Error() }
+func (e *bookLayoutError) Unwrap() error { return e.err }
+
+func bookLayoutFailed(phase, reason, code string, err error) error {
+	return &bookLayoutError{phase, reason, code, err}
+}
+
 // parseBookBatch parses the next unparsed run of pages and reports how many
-// pages of the book are parsed afterwards.
-func (s *Server) parseBookBatch(ctx context.Context, documentID string) (bookLayoutProgress, error) {
+// pages of the book are parsed afterwards. batch receives the chosen pages.
+func (s *Server) parseBookBatch(ctx context.Context, documentID string, batch *bookLayoutBatch) (bookLayoutProgress, error) {
 	lock := s.bookLayoutLock(documentID)
 	lock.Lock()
 	defer lock.Unlock()
 	progress := bookLayoutProgress{}
 	d, err := s.Store.Document(documentID)
 	if err != nil {
-		return progress, err
+		return progress, bookLayoutFailed("document", "document_unreadable", "store", err)
 	}
 	var known *layoutManifest
 	if m, err := s.readLayout(d.ID); err == nil {
@@ -180,27 +224,33 @@ func (s *Server) parseBookBatch(ctx context.Context, documentID string) (bookLay
 	starts := s.bookChapterStarts(ctx, d)
 	from, to, ok := nextBookBatch(known, total, starts, readingPage(d))
 	if ok {
+		*batch = bookLayoutBatch{From: from, To: to, Chapters: len(starts)}
+		for i, start := range starts {
+			if start <= from {
+				batch.Chapter, batch.ChapterStart = i+1, start
+			}
+		}
 		work := filepath.Join(s.Store.Root, "cache", d.ID, "analysis-book-work")
 		if err = s.runLayout(ctx, d, work, from, to, nil); err != nil {
-			return progress, err
+			return progress, bookLayoutFailed("layout", "worker_failed", "process", err)
 		}
 		if err = s.mergeLayout(d.ID, work); err != nil {
-			return progress, err
+			return progress, bookLayoutFailed("merge", "merge_failed", "save", err)
 		}
 		m, err := s.readLayout(d.ID)
 		if err != nil {
-			return progress, err
+			return progress, bookLayoutFailed("manifest", "manifest_unreadable", "save", err)
 		}
 		if !parsedPage(&m, from) {
-			return progress, errors.New("后台解析未返回请求的页面")
+			return progress, bookLayoutFailed("manifest", "page_missing", "protocol", errors.New("后台解析未返回请求的页面"))
 		}
 		known = &m
 		if err = s.publishParsedTranslations(d.ID, m, from, to); err != nil {
-			return progress, err
+			return progress, bookLayoutFailed("publish", "publish_failed", "store", err)
 		}
 	}
 	if known == nil {
-		return progress, errors.New("无法读取 PDF 页数")
+		return progress, bookLayoutFailed("page_count", "page_count_unreadable", "parse", errors.New("无法读取 PDF 页数"))
 	}
 	progress.PagesTotal = known.Pages
 	for page := 1; page <= known.Pages; page++ {

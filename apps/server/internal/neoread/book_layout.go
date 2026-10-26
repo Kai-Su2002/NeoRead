@@ -42,6 +42,7 @@ func (s *Server) runLayout(ctx context.Context, d Document, work string, from, t
 		}
 		s.diagnosticEvent(level, "pdf.parse.finish", "runId", runID, "documentId", d.ID,
 			"stage", lastStage, "outcome", outcome, "exitCode", exitCode,
+			"fromPage", from, "toPage", to,
 			"exitCodeHex", layoutExitHex(exitCode), "nativeDiagnostics", stderr.nativeCodes(), "nativeTrace", stderr.nativeTrace(),
 			"durationMs", time.Since(started).Milliseconds(), "stderrBytes", stderr.total,
 			"stderrFingerprint", stderr.fingerprint(), "stderrTruncated", stderr.total > int64(len(stderr.tail)),

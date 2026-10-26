@@ -242,6 +242,51 @@ func TestBookOutlineOutcomeIsDiagnosed(t *testing.T) {
 	}
 }
 
+func TestBookLayoutFailureNamesTheChapter(t *testing.T) {
+	s := testServer(t)
+	s.Token = "test-secret"
+	directory := filepath.Join(s.Store.Root, "logs")
+	logs, err := diagnostics.New(directory, "layout-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.SetDiagnostics(logs)
+	fakeLayout(t)
+	fakeOutline(t, `[{"title":"PRIVATE One","page":1,"depth":0},{"title":"PRIVATE Two","page":31,"depth":0},{"title":"Three","page":61,"depth":0}]`)
+	t.Setenv("FAKE_LAYOUT_FAIL_FROM", "31")
+	d := uploadBook(t, s)
+	s.runBookLayoutBatch(context.Background(), d.ID)
+	s.runBookLayoutBatch(context.Background(), d.ID)
+	files, _ := filepath.Glob(filepath.Join(directory, "*.jsonl"))
+	var all strings.Builder
+	for _, file := range files {
+		b, _ := os.ReadFile(file)
+		all.Write(b)
+	}
+	var failed map[string]any
+	for line := range strings.SplitSeq(all.String(), "\n") {
+		if strings.Contains(line, `"event":"book.layout.batch"`) && strings.Contains(line, `"outcome":"failed"`) {
+			if err := json.Unmarshal([]byte(line), &failed); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	want := map[string]any{"documentId": d.ID, "level": "error", "jobStatus": "failed", "phase": "layout",
+		"reasonCode": "worker_failed", "errorCode": "process", "fromPage": 31.0, "toPage": 60.0,
+		"chapter": 2.0, "chapterStartPage": 31.0, "chapters": 3.0}
+	for key, value := range want {
+		if failed[key] != value {
+			t.Errorf("%s = %v, want %v in %v", key, failed[key], value, failed)
+		}
+	}
+	if !strings.Contains(all.String(), `"outcome":"complete"`) {
+		t.Error("successful batch left no terminal event")
+	}
+	if strings.Contains(all.String(), "PRIVATE") {
+		t.Fatal("chapter titles leaked into diagnostics")
+	}
+}
+
 func TestBookLayoutFailureWaitsForTheReader(t *testing.T) {
 	s := testServer(t)
 	s.Token = "test-secret"
