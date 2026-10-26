@@ -814,11 +814,9 @@ kbd {
 .navigation-label {
   flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
   overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .navigation-link small {
   flex-shrink: 0;
