@@ -14,7 +14,7 @@ import {
   Command,
   X,
   Tags,
-  Pencil,
+  CheckSquare,
   Check,
   CirclePlus,
   Info,
@@ -65,7 +65,7 @@ import { flushProgress } from "./progress";
 import { useProcessing } from "./ProcessingStatus";
 import { useUpdateProgress } from "./update-progress";
 import { useResolvedTheme } from "./appearance";
-import { DocumentEditor, LibraryFilterBar } from "./DocumentManagement";
+import { LibraryFilterBar } from "./DocumentManagement";
 import { TagBoards } from "./TagBoards";
 import { LibraryDocuments } from "./LibraryDocuments";
 import { BookDetail, saveBookDetailWidth } from "./BookDetail";
@@ -113,7 +113,6 @@ export function App() {
   const [filters, setFilters] = useState(initialFilters);
   const [libraryView, setLibraryView] = useState<"grid" | "list">("grid");
   const [editingLibrary, setEditingLibrary] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [libraryBody, setLibraryBody] = useState<HTMLDivElement | null>(null);
   const pressedEmpty = useRef(false);
@@ -420,7 +419,6 @@ export function App() {
     commandQuery,
     initialFilters,
   );
-  const editing = documents.find((d) => d.id === editingId);
   const awaitingClassification = documents.some(
     (d) =>
       d.classificationStatus === "pending" ||
@@ -460,7 +458,6 @@ export function App() {
   const bookActions: BookMenuActions = {
     overview: setOverviewDocument,
     usage: setUsageDocument,
-    edit: (doc) => setEditingId(doc.id),
     move: (doc, library) => void moveDocument(doc, library),
     trash: (doc) => void trashWithUndo([doc.id]),
   };
@@ -546,7 +543,7 @@ export function App() {
                   {[
                     {
                       id: "all",
-                      label: papers ? "全部论文" : "全部文档",
+                      label: papers ? "全部论文" : "全部图书",
                       icon: Library,
                       count: documents.length,
                     },
@@ -692,7 +689,7 @@ export function App() {
                             ? "收藏"
                             : papers
                               ? "全部论文"
-                              : "全部文档"}
+                              : "全部图书"}
                     </h1>
                   </div>
                   {filter === "tags" ? (
@@ -712,8 +709,8 @@ export function App() {
                       disabled={!filtered.length && !editingLibrary}
                       onClick={() => setEditingLibrary(!editingLibrary)}
                     >
-                      {editingLibrary ? <Check /> : <Pencil />}
-                      {editingLibrary ? "完成" : "编辑"}
+                      {editingLibrary ? <Check /> : <CheckSquare />}
+                      {editingLibrary ? "完成" : "批量"}
                     </Button>
                   )}
                 </header>
@@ -774,7 +771,6 @@ export function App() {
                           processingError={processingError}
                           openDocument={openDocument}
                           favorite={favorite}
-                          onEdit={setEditingId}
                           onSettings={() => setSettings(true)}
                           onOverview={setOverviewDocument}
                           onUsage={setUsageDocument}
@@ -783,7 +779,9 @@ export function App() {
                         />
                       ) : filtered.length ? (
                         <LibraryDocuments
-                          openDocuments={theme.documentTabs ? openDocuments : undefined}
+                          openDocuments={
+                            theme.documentTabs ? openDocuments : undefined
+                          }
                           key={JSON.stringify([filter, query, filters])}
                           documents={filtered}
                           libraryView={libraryView}
@@ -793,7 +791,6 @@ export function App() {
                           processingError={processingError}
                           openDocument={openDocument}
                           favorite={favorite}
-                          onEdit={setEditingId}
                           onMove={moveDocument}
                           onSettings={() => setSettings(true)}
                           onOverview={setOverviewDocument}
@@ -829,7 +826,7 @@ export function App() {
                                 setFilter("all");
                               }}
                             >
-                              显示全部文档
+                              显示全部图书
                             </Button>
                           )}
                           {!documents.length && !papers && (
@@ -858,6 +855,17 @@ export function App() {
                         key={detail.id}
                         doc={detail}
                         actions={bookActions}
+                        onSelectTag={(tag) => {
+                          setFilter("all");
+                          setFilters({
+                            ...initialFilters,
+                            tags: [tag.toLowerCase()],
+                          });
+                        }}
+                        pages={
+                          jobsById.get(detail.id)?.bookLayout?.pagesTotal ||
+                          jobsById.get(detail.id)?.pagesTotal
+                        }
                         open={openDocument}
                         favorite={(doc) => void favorite(doc)}
                       />
@@ -867,14 +875,6 @@ export function App() {
               </main>
             )}
           </div>
-        )}
-        {editing && (
-          <DocumentEditor
-            key={editing.id}
-            document={editing}
-            documents={documents}
-            onClose={() => setEditingId(null)}
-          />
         )}
         <DocumentOverviewDialog
           key={overviewDocument?.id}

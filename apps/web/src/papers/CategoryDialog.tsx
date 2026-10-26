@@ -12,6 +12,7 @@ import {
 /** Names a new category or tag; `count` papers receive it on save. */
 export function CategoryDialog({
   count,
+  itemLabel = "篇论文",
   parent,
   kind = "category",
   suggestions = [],
@@ -19,6 +20,7 @@ export function CategoryDialog({
   onClose,
 }: {
   count: number;
+  itemLabel?: string;
   parent?: string;
   kind?: "category" | "tag";
   suggestions?: string[];
@@ -49,8 +51,8 @@ export function CategoryDialog({
               parent && `位于“${parent.replaceAll("/", " / ")}”`,
               count &&
                 (kind === "tag"
-                  ? `加到所选的 ${count} 篇论文`
-                  : `放入所选的 ${count} 篇论文`),
+                  ? `加到所选的 ${count} ${itemLabel}`
+                  : `放入所选的 ${count} ${itemLabel}`),
             ]
               .filter(Boolean)
               .join("，") || `输入${noun}名`}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BookOpen, MoreHorizontal, Pencil, Plus, Star } from "lucide-react";
+import { BookOpen, MoreHorizontal, Star } from "lucide-react";
 import type { Document, PaperMetadataField } from "@neoread/core";
 import { Button } from "@neoread/ui/components/button";
 import { Input } from "@neoread/ui/components/input";
@@ -9,10 +9,12 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@neoread/ui/components/dropdown-menu";
-import { patchPapers } from "./papers/actions";
-import { Field } from "./papers/PaperDetail";
+import { addTag, patchPapers } from "./papers/actions";
+import { Field, TagChips } from "./papers/PaperDetail";
 import { relativeTime, wasOpened } from "./papers/format";
-import { DocumentBadges } from "./DocumentManagement";
+import { CategoryDialog } from "./papers/CategoryDialog";
+import { libraryTags } from "./library";
+import { toast } from "sonner";
 import { BookCoverImage } from "./book-cover";
 import { BookMenuItems, type BookMenuActions } from "./BookMenu";
 import { updateLibraryPreferences, useReaderStore } from "./store";
@@ -38,18 +40,47 @@ export function BookDetail({
   actions,
   open,
   favorite,
+  pages,
+  onSelectTag,
 }: {
   doc: Document;
   actions: BookMenuActions;
   open: (doc: Document) => void;
   favorite: (doc: Document) => void;
+  pages?: number;
+  onSelectTag?: (tag: string) => void;
 }) {
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
+  const [tagging, setTagging] = useState(false);
+  const documents = useReaderStore((s) => s.documents);
   const m = doc.metadata;
   const percent = Math.round(doc.percentage * 100);
   return (
     <aside className="paper-detail book-detail" aria-label="图书详情">
+      {tagging && (
+        <CategoryDialog
+          kind="tag"
+          itemLabel="本图书"
+          count={1}
+          suggestions={libraryTags(documents).filter(
+            (tag) =>
+              !doc.tags.some(
+                (existing) => existing.toLowerCase() === tag.toLowerCase(),
+              ),
+          )}
+          onClose={() => setTagging(false)}
+          onSave={async (name) => {
+            const tag = name.trim().replace(/^#/, "");
+            if (!tag || [...tag].length > 40) {
+              toast.error("标签须为 1–40 个字符");
+              return false;
+            }
+            await addTag([doc], tag);
+            return true;
+          }}
+        />
+      )}
       <div className="paper-detail-body">
         <div className="book-detail-cover">
           <BookCoverImage doc={doc} />
@@ -89,15 +120,6 @@ export function BookDetail({
               className={doc.favorite ? "fill-current text-amber-500" : ""}
             />
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            aria-label="编辑文档信息"
-            title="编辑文档信息"
-            onClick={() => actions.edit(doc)}
-          >
-            <Pencil />
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -107,12 +129,7 @@ export function BookDetail({
               <MoreHorizontal />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
-              <BookMenuItems
-                kind="dropdown"
-                doc={doc}
-                actions={actions}
-                inPanel
-              />
+              <BookMenuItems kind="dropdown" doc={doc} actions={actions} />
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -126,17 +143,12 @@ export function BookDetail({
             <Field doc={doc} name="remark" multiline />
           </dd>
           <dt>标签</dt>
-          <dd className="book-detail-tags">
-            <DocumentBadges document={doc} />
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              className="rounded-full"
-              aria-label="编辑标签"
-              onClick={() => actions.edit(doc)}
-            >
-              <Plus />
-            </Button>
+          <dd>
+            <TagChips
+              doc={doc}
+              onAdd={() => setTagging(true)}
+              onSelect={onSelectTag}
+            />
           </dd>
         </dl>
         <div className="paper-fields-heading">
@@ -178,6 +190,14 @@ export function BookDetail({
               placeholder={placeholder}
             />
           ))}
+          {doc.type === "pdf" && (
+            <>
+              <dt>页数</dt>
+              <dd className="paper-field-static">
+                {pages && pages > 0 ? `${pages} 页` : "—"}
+              </dd>
+            </>
+          )}
           <dt>文件</dt>
           <dd className="paper-field-static">
             {doc.type.toUpperCase()} · {(doc.size / 1024 / 1024).toFixed(1)} MB

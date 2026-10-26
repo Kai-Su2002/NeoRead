@@ -4,10 +4,9 @@ import {
   FileText,
   ArrowUpRight,
   Star,
-  Pencil,
+  CheckSquare,
   Trash2,
   Check,
-  ChartColumn,
 } from "lucide-react";
 import type { Document, LibraryMode, Processing } from "@neoread/core";
 import { api } from "@neoread/api";
@@ -20,7 +19,6 @@ import {
   ContextMenuContent,
   ContextMenuItem,
 } from "@neoread/ui/components/context-menu";
-import { DocumentBadges } from "./DocumentManagement";
 import { CoverOverview, useOverviewJobs } from "./DocumentOverview";
 import { CoverProcessing } from "./ProcessingStatus";
 import { toggleDocumentSelection, trashWithUndo } from "./library-actions";
@@ -36,7 +34,6 @@ export function LibraryDocuments({
   openDocument,
   openDocuments,
   favorite,
-  onEdit,
   onMove,
   onSettings,
   onOverview,
@@ -53,7 +50,6 @@ export function LibraryDocuments({
   openDocument: (doc: Document) => void;
   openDocuments?: (docs: Document[]) => void;
   favorite: (doc: Document) => void;
-  onEdit: (id: string) => void;
   onMove?: (doc: Document, library: LibraryMode) => void;
   onSettings: () => void;
   onOverview: (doc: Document) => void;
@@ -146,8 +142,8 @@ export function LibraryDocuments({
               aria-pressed={selecting}
               onClick={() => changeEditing(!selecting)}
             >
-              {selecting ? <Check /> : <Pencil />}
-              {selecting ? "完成" : "编辑"}
+              {selecting ? <Check /> : <CheckSquare />}
+              {selecting ? "完成" : "批量"}
             </Button>
           )}
           {selecting && (
@@ -375,35 +371,6 @@ export function LibraryDocuments({
                   />
                 </Button>
               </div>
-              <div className="document-organization">
-                <DocumentBadges document={doc} />
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  aria-label={`查看 ${doc.title} 的用量统计`}
-                  title="用量统计"
-                  data-document-action
-                  onClick={() => onUsage(doc)}
-                >
-                  <ChartColumn />
-                </Button>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  aria-label={`编辑 ${doc.title} 的信息`}
-                  data-document-action
-                  title="编辑文档信息"
-                  onClick={() => onEdit(doc.id)}
-                >
-                  <Pencil />
-                </Button>
-              </div>
-              {doc.categorySource !== "manual" &&
-                doc.classificationStatus === "failed" && (
-                  <p className="classification-status">
-                    AI 分类失败 · 可手动修改或重试
-                  </p>
-                )}
               <div className="book-progress">
                 <div
                   style={{
@@ -425,7 +392,6 @@ export function LibraryDocuments({
                 actions={{
                   overview: onOverview,
                   usage: onUsage,
-                  edit: (d) => onEdit(d.id),
                   move: onMove,
                   trash: (d) => void trash([d.id]),
                 }}

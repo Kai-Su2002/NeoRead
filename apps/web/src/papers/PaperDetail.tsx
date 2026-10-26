@@ -622,7 +622,15 @@ function FolderChips({
 }
 
 /** The paper's tags; click one to list every paper carrying it. */
-function TagChips({ doc, onAdd }: { doc: Document; onAdd: () => void }) {
+export function TagChips({
+  doc,
+  onAdd,
+  onSelect,
+}: {
+  doc: Document;
+  onAdd: () => void;
+  onSelect?: (tag: string) => void;
+}) {
   const setView = usePaperUI((s) => s.setView);
   return (
     <div className="paper-chips paper-tag-chips" aria-label="标签">
@@ -630,9 +638,9 @@ function TagChips({ doc, onAdd }: { doc: Document; onAdd: () => void }) {
         <Chip
           key={tag}
           label={`#${tag}`}
-          title={`查看带 #${tag} 的论文`}
+          title={`查看带 #${tag} 的${doc.library === "books" ? "图书" : "论文"}`}
           removeLabel={`删除标签 ${tag}`}
-          onClick={() => setView(`tag:${tag}`)}
+          onClick={() => (onSelect ? onSelect(tag) : setView(`tag:${tag}`))}
           onRemove={() => void removeTag([doc], tag)}
         />
       ))}

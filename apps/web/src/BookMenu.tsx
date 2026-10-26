@@ -3,7 +3,6 @@ import {
   BookOpen,
   ChartColumn,
   FileDown,
-  Pencil,
   RefreshCw,
   Trash2,
 } from "lucide-react";
@@ -27,7 +26,6 @@ const kits = {
 export interface BookMenuActions {
   overview: (doc: Document) => void;
   usage: (doc: Document) => void;
-  edit: (doc: Document) => void;
   move?: (doc: Document, library: LibraryMode) => void;
   trash: (doc: Document) => void;
 }
@@ -37,13 +35,10 @@ export function BookMenuItems({
   kind,
   doc,
   actions,
-  inPanel = false,
 }: {
   kind: keyof typeof kits;
   doc: Document;
   actions: BookMenuActions;
-  /** The detail panel has its own edit button. */
-  inPanel?: boolean;
 }) {
   const K = kits[kind];
   return (
@@ -56,12 +51,6 @@ export function BookMenuItems({
         <ChartColumn />
         用量统计
       </K.Item>
-      {!inPanel && (
-        <K.Item onClick={() => actions.edit(doc)}>
-          <Pencil />
-          编辑文档信息
-        </K.Item>
-      )}
       <K.Item onClick={() => void reparseDocument(doc)}>
         <RefreshCw />
         重新解析

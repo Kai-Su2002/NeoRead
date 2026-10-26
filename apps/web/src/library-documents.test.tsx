@@ -66,7 +66,7 @@ function Harness() {
       openDocument={open}
       openDocuments={openMany}
       favorite={() => {}}
-      onEdit={edit}
+
       onSettings={() => {}}
       onOverview={overview}
       onUsage={() => {}}
@@ -120,7 +120,7 @@ const button = (label: string) =>
     (b) => b.textContent?.trim() === label,
   )!;
 it("moves selected documents to the trash, keeps failures and offers an undo", async () => {
-  await act(async () => button("编辑").click());
+  await act(async () => button("批量").click());
   await act(async () =>
     host.querySelector("article")!.dispatchEvent(
       new KeyboardEvent("keydown", {
@@ -152,7 +152,7 @@ it("moves selected documents to the trash, keeps failures and offers an undo", a
   expect(open).not.toHaveBeenCalled();
 });
 it("leaves selection mode after all selected documents move to the trash", async () => {
-  await act(async () => button("编辑").click());
+  await act(async () => button("批量").click());
   await act(async () =>
     host.querySelector("article")!.dispatchEvent(
       new KeyboardEvent("keydown", {
@@ -167,10 +167,10 @@ it("leaves selection mode after all selected documents move to the trash", async
 
   await act(async () => button("移到回收站").click());
 
-  expect(button("编辑")).toBeDefined();
+  expect(button("批量")).toBeDefined();
   expect(host.textContent).not.toContain("已选");
 });
-it("opens the context menu on the targeted document and edits that document", async () => {
+it("opens the context menu on the targeted document without a legacy editor", async () => {
   const card = host.querySelectorAll("article")[1];
   await act(async () =>
     card.dispatchEvent(
@@ -182,12 +182,18 @@ it("opens the context menu on the targeted document and edits that document", as
       }),
     ),
   );
-  const item = [
+  const items = [
     ...document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
-  ].find((el) => el.textContent?.includes("编辑文档信息"));
-  expect(item).toBeDefined();
-  await act(async () => item!.click());
-  expect(edit).toHaveBeenCalledExactlyOnceWith("1");
+  ];
+  expect(items.some((el) => el.textContent?.includes("编辑文档信息"))).toBe(
+    false,
+  );
+  const overviewItem = items.find((el) => el.textContent?.includes("文档概要"));
+  expect(overviewItem).toBeDefined();
+  await act(async () => overviewItem!.click());
+  expect(overview).toHaveBeenCalledExactlyOnceWith(
+    useReaderStore.getState().documents[1],
+  );
   expect(open).not.toHaveBeenCalled();
 });
 
@@ -206,14 +212,14 @@ it("requires edit mode before selecting and clears selection on exit", async () 
     shortcut();
   });
   expect(host.textContent).not.toContain("已选");
-  await act(async () => button("编辑").click());
+  await act(async () => button("批量").click());
   await act(async () => {
     shortcut();
   });
   expect(host.textContent).toContain("已选 2 份");
   await act(async () => button("完成").click());
   expect(host.querySelector('[role="checkbox"]')).toBeNull();
-  await act(async () => button("编辑").click());
+  await act(async () => button("批量").click());
   expect(host.textContent).toContain("已选 0 份");
 });
 
@@ -307,18 +313,16 @@ it("shows details on click and opens on double click", async () => {
 });
 
 it("opens the selected documents together in tabs", async () => {
-  await act(async () => button("编辑").click());
+  await act(async () => button("批量").click());
   await act(async () =>
-    host
-      .querySelector("article")!
-      .dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: "a",
-          metaKey: true,
-          bubbles: true,
-          cancelable: true,
-        }),
-      ),
+    host.querySelector("article")!.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "a",
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    ),
   );
   await act(async () => button("在标签页中打开").click());
   expect(openMany).toHaveBeenCalledExactlyOnceWith(docs);

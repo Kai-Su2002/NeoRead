@@ -257,3 +257,78 @@ it("resizes the detail sheet and keeps the width", async () => {
   );
   expect(sheet.style.getPropertyValue("--paper-detail-width")).toBe("416px");
 });
+
+it("shows only real tags and edits them directly from book details", async () => {
+  const doc = book();
+  useReaderStore.setState({ documents: [doc] });
+  const selectTag = vi.fn();
+  await act(async () =>
+    root.render(
+      <BookDetail
+        doc={doc}
+        actions={actions}
+        open={() => {}}
+        favorite={() => {}}
+        onSelectTag={selectTag}
+      />,
+    ),
+  );
+  expect(host.querySelector('[aria-label="编辑文档信息"]')).toBeNull();
+  expect(host.querySelector('[aria-label="标签"]')?.textContent).toContain(
+    "#系统",
+  );
+  expect(host.querySelector('[aria-label="标签"]')?.textContent).not.toContain(
+    "书籍",
+  );
+  await act(async () =>
+    [...host.querySelectorAll("button")]
+      .find((button) => button.textContent === "#系统")!
+      .click(),
+  );
+  expect(selectTag).toHaveBeenCalledWith("系统");
+  await act(async () => field("删除标签 系统").click());
+  expect(mocks.update).toHaveBeenCalledWith("b1", { tags: [] });
+  await act(async () =>
+    root.render(
+      <BookDetail
+        doc={useReaderStore.getState().documents[0]}
+        actions={actions}
+        open={() => {}}
+        favorite={() => {}}
+        onSelectTag={selectTag}
+      />,
+    ),
+  );
+  await act(async () => field("添加标签").click());
+  const input =
+    document.querySelector<HTMLInputElement>('[aria-label="标签名"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(input, "阅读");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () =>
+    input
+      .closest("form")!
+      .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })),
+  );
+  expect(mocks.update).toHaveBeenCalledWith("b1", { tags: ["阅读"] });
+});
+
+it("shows PDF page counts in book information", async () => {
+  const doc = book({ type: "pdf" });
+  await act(async () =>
+    root.render(
+      <BookDetail
+        doc={doc}
+        actions={actions}
+        open={() => {}}
+        favorite={() => {}}
+        pages={320}
+      />,
+    ),
+  );
+  expect(host.textContent).toContain("320 页");
+});
