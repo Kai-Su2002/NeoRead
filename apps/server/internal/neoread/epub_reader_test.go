@@ -59,6 +59,17 @@ func TestEPUBReaderSanitizerAndBlockAlignment(t *testing.T) {
 		}
 	}
 }
+
+func TestEPUBReaderKeepsBodyTOCAnchor(t *testing.T) {
+	source := `<html><body id="chapter-start"><h1>Chapter</h1><p>First paragraph.</p></body></html>`
+	rendered, blocks, err := renderEPUBChapter("chapter.xhtml", source, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(rendered, `id="chapter-start"`) || len(blocks) == 0 || !strings.Contains(rendered, "First paragraph.") {
+		t.Fatalf("body TOC anchor or prose lost: %s", rendered)
+	}
+}
 func TestEPUBReaderURLs(t *testing.T) {
 	for _, value := range []string{"../../../escape", "%2e%2e/%2e%2e/escape", "//evil.test/x", "/app", "https://evil.test/x", "javascript:alert(1)", "data:image/png,bad", "..\\escape", "java\nscript:bad"} {
 		if got := epubURL("EPUB/a.xhtml", value, true); got != "" {

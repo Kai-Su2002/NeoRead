@@ -120,8 +120,17 @@ func renderEPUBChapter(href, source, resources string) (string, epubTranslationD
 			return
 		}
 		target := parent
-		if epubElements[n.Data] && n.Data != "body" {
+		bodyAnchor := false
+		if n.Data == "body" {
+			for _, a := range n.Attr {
+				bodyAnchor = bodyAnchor || (a.Namespace == "" && a.Key == "id" && a.Val != "")
+			}
+		}
+		if epubElements[n.Data] && (n.Data != "body" || bodyAnchor) {
 			tag := n.Data
+			if tag == "body" {
+				tag = "div"
+			}
 			if tag == "image" {
 				tag = "img"
 			}
