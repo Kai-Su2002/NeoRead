@@ -286,3 +286,48 @@ func TestEPUBReaderLayoutDeclarationsSelectorSubjects(t *testing.T) {
 		})
 	}
 }
+
+func TestEPUBReaderSummaryDoesNotReadChapterBodies(t *testing.T) {
+	s := testServer(t)
+	response := upload(t, s, "the-art-of-reading.epub", sample(t, "the-art-of-reading.epub"))
+	var d Document
+	json.Unmarshal(response.Body.Bytes(), &d)
+	manifest, err := s.readerManifest(d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A missing distant chapter must not prevent opening the chapter list.
+	name, _ := safeResource(manifest.ReadingOrder[len(manifest.ReadingOrder)-1].Href)
+	if err := os.Remove(filepath.Join(s.Store.Root, "cache", d.ID, filepath.FromSlash(name))); err != nil {
+		t.Fatal(err)
+	}
+	response = request(t, s, "GET", "/api/documents/"+d.ID+"/epub-chapters?summary=1", nil)
+	var listing struct {
+		Chapters []epubReaderChapter `json:"chapters"`
+	}
+	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &listing) != nil {
+		t.Fatal(response.Body.String())
+	}
+	if len(listing.Chapters) != len(manifest.ReadingOrder) {
+		t.Fatal("incomplete spine")
+	}
+	for _, c := range listing.Chapters {
+		if len(c.Blocks) != 0 {
+			t.Fatal("summary contains body", c.Href)
+		}
+	}
+	first := listing.Chapters[0]
+	response = request(t, s, "GET", "/api/documents/"+d.ID+"/epub-chapter?href="+url.QueryEscape(first.Href), nil)
+	var chapter struct {
+		HTML   string             `json:"html"`
+		Blocks []EPUBReadingBlock `json:"blocks"`
+	}
+	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &chapter) != nil || len(chapter.Blocks) == 0 {
+		t.Fatal(response.Body.String())
+	}
+	for _, b := range chapter.Blocks {
+		if !strings.Contains(chapter.HTML, `data-epub-block="`+b.ID+`"`) {
+			t.Fatal(b.ID)
+		}
+	}
+}

@@ -66,6 +66,14 @@ const adapter = {
   getContext: vi.fn(async () => ""),
   destroy: vi.fn(async () => {}),
   setEPUBBlocks: vi.fn(),
+  getEPUBChapters: () =>
+    ["a.xhtml", "b.xhtml"].map((href, index) => ({
+      href,
+      index,
+      title: href,
+      characters: 32,
+      blocks: [],
+    })),
   fitColumn: vi.fn(async () => {}),
   stopColumnFit: vi.fn(),
   followBlock: vi.fn(async () => {}),
@@ -84,7 +92,10 @@ vi.mock("../ReaderView", () => ({
     onReady: (a: ReaderAdapter, t: []) => void;
   }) => {
     fixture.events = events;
-    useEffect(() => onReady(adapter, []), []);
+    useEffect(() => {
+      events.epubBlocksChanged?.(blocks);
+      onReady(adapter, []);
+    }, []);
     return <div>EPUB 原文</div>;
   },
 }));
@@ -189,7 +200,7 @@ it("supports all modes and chapter navigation without PDF page locations", async
     expect.objectContaining({ type: "epub", href: "b.xhtml" }),
     expect.any(Number),
   );
-  expect(adapter.goTo).not.toHaveBeenCalled();
+  expect(adapter.goTo).toHaveBeenCalledWith({ type: "epub", href: "b.xhtml" });
   expect(await fixture.ready!.getContext()).toBe(blocks[1].text);
   expect(adapter.getContext).not.toHaveBeenCalled();
   await click("原文译文");
@@ -458,4 +469,17 @@ it("initializes chapter context in memory without saving progress on open", asyn
   });
   expect(await fixture.ready!.getContext()).toBe(blocks[0].text);
   expect(events.location).not.toHaveBeenCalled();
+});
+
+it("uses only the reader's loaded blocks and subscribes only to their chapters", async () => {
+  const { api } = await import("@neoread/api");
+  expect(api.epubBlocks).not.toHaveBeenCalled();
+  await act(async () => fixture.events!.epubBlocksChanged?.([blocks[1]]));
+  expect(host.querySelector('[data-chapter="a.xhtml"]')).toBeNull();
+  expect(api.translationStream).toHaveBeenLastCalledWith(
+    "doc",
+    expect.any(AbortSignal),
+    expect.any(Function),
+    ["b.xhtml"],
+  );
 });

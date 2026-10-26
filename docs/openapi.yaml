@@ -3013,6 +3013,12 @@
                     "required": true,
                     "schema": { "type": "string" },
                   },
+                  {
+                    "in": "query",
+                    "name": "summary",
+                    "schema": { "type": "string", "enum": ["1"] },
+                    "description": "Return spine metadata with empty blocks and estimated character counts, without reading chapter bodies.",
+                  },
                 ],
               "responses":
                 {
@@ -3077,6 +3083,14 @@
                                   "required": ["html"],
                                   "properties":
                                     {
+                                      "blocks":
+                                        {
+                                          "type": "array",
+                                          "items":
+                                            {
+                                              "$ref": "#/components/schemas/EPUBReadingBlock",
+                                            },
+                                        },
                                       "html":
                                         {
                                           "type": "string",
@@ -3774,6 +3788,15 @@
                     "in": "path",
                     "required": true,
                     "schema": { "type": "string" },
+                  },
+                  {
+                    "in": "query",
+                    "name": "href",
+                    "style": "form",
+                    "explode": true,
+                    "schema":
+                      { "type": "array", "items": { "type": "string" } },
+                    "description": "EPUB chapter hrefs. When provided, only these chapters are parsed and their translations subscribed to.",
                   },
                 ],
               "responses":
@@ -7236,6 +7259,7 @@
                   "start": { "type": "integer", "minimum": 0 },
                   "end": { "type": "integer", "minimum": 0 },
                   "endBlockId": { "type": "string" },
+                  "endHref": { "type": "string" },
                   "locator": { "type": "string" },
                   "progression": { "type": "number" },
                   "quote": { "type": "string" },

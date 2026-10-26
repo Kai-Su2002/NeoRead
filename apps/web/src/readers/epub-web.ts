@@ -35,6 +35,7 @@ import "./epub-web.css";
 let sequence = 0;
 type Chapter = {
   info: EPUBChapter;
+  weight: number;
   node: HTMLElement;
   loaded: boolean;
   pending?: Promise<void>;
@@ -204,7 +205,7 @@ export class EPUBReaderAdapter implements ReaderAdapter {
     const listing = await api.epubChapters(doc.id, this.abort.signal);
     if (this.disposed) return;
     this.toc = listing.toc ?? [];
-    this.blocks = listing.chapters.flatMap((chapter) => chapter.blocks);
+    this.blocks = [];
     this.chapters = listing.chapters.map((info) => {
       const node = document.createElement("section");
       node.className = "epub-web-chapter";
@@ -213,7 +214,12 @@ export class EPUBReaderAdapter implements ReaderAdapter {
       node.style.height = `${this.estimate(info)}px`;
       node.setAttribute("aria-busy", "true");
       this.container.append(node);
-      return { info, node, loaded: false };
+      return {
+        info: { ...info },
+        weight: Math.max(1, info.characters),
+        node,
+        loaded: false,
+      };
     });
     if (!this.chapters.length) throw new Error("这本 EPUB 没有可阅读的章节");
     const initial =
@@ -235,6 +241,8 @@ export class EPUBReaderAdapter implements ReaderAdapter {
     if (typeof IntersectionObserver !== "undefined") {
       this.observer = new IntersectionObserver(
         (entries) => {
+          if (!this.container.clientHeight || !this.container.clientWidth)
+            return;
           for (const entry of entries)
             if (entry.isIntersecting) {
               const chapter = this.chapters.find(
@@ -289,12 +297,16 @@ export class EPUBReaderAdapter implements ReaderAdapter {
     if (chapter.loaded || this.disposed) return;
     if (chapter.pending) return chapter.pending;
     chapter.pending = (async () => {
-      const { html } = await api.epubChapter(
+      const { html, blocks } = await api.epubChapter(
         this.doc!.id,
         chapter.info.href,
         this.abort.signal,
       );
       if (this.disposed) return;
+      if (blocks) {
+        chapter.info.blocks = blocks;
+        chapter.info.characters = blocks.reduce((n, b) => n + b.text.length, 0);
+      }
       // Only the authenticated sanitizer endpoint supplies this inert template.
       const template = document.createElement("template");
       template.innerHTML = html;
@@ -315,6 +327,7 @@ export class EPUBReaderAdapter implements ReaderAdapter {
       chapter.node.style.height = "";
       chapter.node.removeAttribute("aria-busy");
       chapter.loaded = true;
+      this.refreshBlocks();
       this.preserveAnchor();
       this.rememberAnchor();
       this.paint();
@@ -323,6 +336,27 @@ export class EPUBReaderAdapter implements ReaderAdapter {
       chapter.pending = undefined;
     });
     return chapter.pending;
+  }
+  private unload(chapter: Chapter) {
+    chapter.node.style.height = `${chapter.node.getBoundingClientRect().height || this.estimate(chapter.info)}px`;
+    chapter.node.replaceChildren();
+    chapter.loaded = false;
+    chapter.info.blocks = [];
+    this.refreshBlocks();
+    this.paint();
+  }
+  private refreshBlocks() {
+    this.blocks = this.chapters
+      .filter((c) => c.loaded)
+      .flatMap((c) => c.info.blocks);
+    this.events.epubBlocksChanged?.(this.blocks);
+  }
+  getEPUBChapters() {
+    return this.chapters.map((c) => ({
+      ...c.info,
+      characters: c.weight,
+      blocks: [],
+    }));
   }
   private rememberAnchor() {
     if (this.restoring || !this.container.clientHeight) return;
@@ -397,10 +431,7 @@ export class EPUBReaderAdapter implements ReaderAdapter {
           !this.focus.length &&
           (rect.bottom < top - 5000 || rect.top > top + height + 5000)
         ) {
-          chapter.node.style.height = `${rect.height}px`;
-          chapter.node.replaceChildren();
-          chapter.loaded = false;
-          this.paint();
+          this.unload(chapter);
         }
       }
     });
@@ -473,18 +504,14 @@ export class EPUBReaderAdapter implements ReaderAdapter {
     const chapter = this.chapter(this.location.href);
     const preceding = this.chapters
       .slice(0, chapter ? this.chapters.indexOf(chapter) : 0)
-      .reduce((n, c) => n + Math.max(1, c.info.characters), 0);
-    const total = this.chapters.reduce(
-      (n, c) => n + Math.max(1, c.info.characters),
-      0,
-    );
+      .reduce((n, c) => n + c.weight, 0);
+    const total = this.chapters.reduce((n, c) => n + c.weight, 0);
     this.events.location(
       this.location,
       Math.min(
         1,
         (preceding +
-          (this.location.progression ?? 0) *
-            Math.max(1, chapter?.info.characters ?? 0)) /
+          (this.location.progression ?? 0) * (chapter?.weight ?? 1)) /
           Math.max(1, total),
       ),
     );
@@ -513,6 +540,40 @@ export class EPUBReaderAdapter implements ReaderAdapter {
       await this.load(chapter);
       if (this.disposed || revision !== this.navigation) return;
       const canonical = { ...location, href: chapter.info.href };
+      if (location.endBlockId && location.endBlockId !== location.blockId) {
+        const start = this.chapters.indexOf(chapter);
+        const endHref =
+          location.endHref ??
+          this.blocks.find((b) => b.id === location.endBlockId)?.location.href;
+        let end = endHref
+          ? this.chapters.findIndex((c) => c.info.href === endHref)
+          : -1;
+        // Older cross-chapter notes have only the end block ID. Look it up on
+        // explicit navigation, discarding each candidate response immediately.
+        if (!endHref)
+          for (let i = start + 1; i < this.chapters.length; i++) {
+            const candidate = this.chapters[i];
+            const blocks = candidate.loaded
+              ? candidate.info.blocks
+              : ((
+                  await api.epubChapter(
+                    this.doc!.id,
+                    candidate.info.href,
+                    this.abort.signal,
+                  )
+                ).blocks ?? candidate.info.blocks);
+            if (this.disposed || revision !== this.navigation) return;
+            if (blocks.some((b) => b.id === location.endBlockId)) {
+              end = i;
+              break;
+            }
+          }
+        if (end >= start)
+          for (const part of this.chapters.slice(start + 1, end + 1)) {
+            await this.load(part);
+            if (this.disposed || revision !== this.navigation) return;
+          }
+      }
       const slices = resolveEPUBLocation(canonical, this.blocks);
       for (const href of new Set(
         slices.map((slice) => slice.block.location.href),
@@ -628,6 +689,25 @@ export class EPUBReaderAdapter implements ReaderAdapter {
         selected?.addRange(range);
         this.capture();
       }
+      // Translation-only mode has no source viewport to drive the observers.
+      if (!this.container.clientHeight && !this.opening) {
+        const index = this.chapters.indexOf(chapter);
+        for (const neighbor of this.chapters.slice(
+          Math.max(0, index - 1),
+          index + 2,
+        )) {
+          await this.load(neighbor);
+          if (this.disposed || revision !== this.navigation) return;
+        }
+        if (!this.selection && !this.focus.length)
+          for (const other of this.chapters) {
+            if (
+              other.loaded &&
+              Math.abs(this.chapters.indexOf(other) - index) > 1
+            )
+              this.unload(other);
+          }
+      }
       this.emitLocation();
       if (slices[0]) this.events.epubReadingAnchor?.(slices[0].block.id);
     } finally {
@@ -666,8 +746,17 @@ export class EPUBReaderAdapter implements ReaderAdapter {
       .join("\\s+");
     for (const chapter of this.chapters) {
       if (!hrefs.has(chapter.info.href)) continue;
+      const blocks = chapter.loaded
+        ? chapter.info.blocks
+        : ((
+            await api.epubChapter(
+              this.doc.id,
+              chapter.info.href,
+              this.abort.signal,
+            )
+          ).blocks ?? chapter.info.blocks);
       let text = "";
-      const spans = chapter.info.blocks
+      const spans = blocks
         .filter((block) => !block.image)
         .map((block) => {
           if (text) text += "\n\n";
@@ -765,6 +854,9 @@ export class EPUBReaderAdapter implements ReaderAdapter {
           )) /
         Math.max(1, chapter.info.characters),
       ...(last.id !== first.id ? { endBlockId: last.id } : {}),
+      ...(last.location.href !== first.location.href
+        ? { endHref: last.location.href }
+        : {}),
     };
     this.selection = {
       context: selectionContext(range, this.container),
@@ -907,8 +999,14 @@ export class EPUBReaderAdapter implements ReaderAdapter {
       ];
       const ranges: Range[] = [];
       for (const location of locations) {
+        if (!this.chapter(location.href)?.loaded) continue;
         const slices = resolveEPUBLocation(location, this.blocks);
-        if (!slices.length) unresolved.push(annotation.id);
+        if (
+          !slices.length &&
+          (!location.endBlockId ||
+            this.blocks.some((b) => b.id === location.endBlockId))
+        )
+          unresolved.push(annotation.id);
         for (const slice of slices) {
           const range = blockRange(this.container, slice);
           if (range) {

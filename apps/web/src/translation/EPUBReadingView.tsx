@@ -3,6 +3,7 @@ import { useTranslations } from "./useTranslations";
 import { readerLayout, updateReaderLayout } from "../neoread-layout";
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ComponentProps,
@@ -56,12 +57,16 @@ export function EPUBReadingView({
   const [mode, setMode] = useState<Mode>("source");
   const { swapped, sourceWidth } = readerLayout(theme.readerLayout);
   const [blocks, setBlocks] = useState<EPUBReadingBlock[]>([]);
-  const { translations, error: streamError } = useTranslations(doc.id);
   const [chapter, setChapter] = useState(
-    doc.progress?.type === "epub" ? doc.progress.href : "",
+    doc.progress?.type === "epub" ? doc.progress.href.split("#")[0] : "",
   );
-  const [error, setError] = useState("");
+  const { translations, error: streamError } = useTranslations(doc.id, [
+    ...new Set(blocks.map((b) => b.location.href)),
+  ]);
   const pane = useRef<HTMLDivElement>(null);
+  const viewportAnchor = useRef<{ id: string; top: number } | undefined>(
+    undefined,
+  );
   const engine = useRef<ReaderAdapter | undefined>(undefined);
   const selection = useRef<ReaderSelection | null>(null);
   const position = useRef<EPUBLocation>(
@@ -182,11 +187,30 @@ export function EPUBReadingView({
   const updateLocation = (location: EPUBLocation) => {
     position.current = location;
     setChapter(location.href.split("#")[0]);
-    const all = live.current.blocks;
-    const block = epubBlocksAt(location, all)[0];
+    const chapters = engine.current?.getEPUBChapters?.() ?? [];
+    const index = chapters.findIndex(
+      (c) => c.href === location.href.split("#")[0],
+    );
+    const current = live.current.blocks.filter(
+      (b) => b.location.href === location.href.split("#")[0],
+    );
+    const block = epubBlocksAt(location, current)[0];
+    const progress =
+      location.progression ??
+      (block ? current.indexOf(block) / Math.max(1, current.length) : 0);
+    const weight = (c: (typeof chapters)[number]) => Math.max(1, c.characters);
+    const preceding = chapters
+      .slice(0, Math.max(0, index))
+      .reduce((n, c) => n + weight(c), 0);
+    const total = chapters.reduce((n, c) => n + weight(c), 0);
     live.current.events.location(
       location,
-      block ? all.indexOf(block) / Math.max(1, all.length) : 0,
+      Math.min(
+        1,
+        (preceding +
+          progress * (chapters[index] ? weight(chapters[index]) : 1)) /
+          Math.max(1, total),
+      ),
     );
   };
   const go = async (location: DocumentLocation) => {
@@ -194,10 +218,8 @@ export function EPUBReadingView({
     clear();
     side.current =
       live.current.mode === "translation" ? "translation" : "source";
-    const navigateSource =
-      live.current.mode !== "translation" || location.href.includes("#");
-    if (navigateSource) await engine.current?.goTo(location);
-    const resolved = navigateSource ? engine.current?.getLocation() : undefined;
+    await engine.current?.goTo(location);
+    const resolved = engine.current?.getLocation();
     if (
       resolved?.type === "epub" &&
       resolved.href === location.href.split("#")[0] &&
@@ -217,10 +239,9 @@ export function EPUBReadingView({
         ? engine.current?.next()
         : engine.current?.previous();
     }
-    const order = [...new Set(live.current.blocks.map((b) => b.location.href))];
+    const order = engine.current?.getEPUBChapters?.().map((c) => c.href) ?? [];
     const href = order[order.indexOf(live.current.chapter) + direction];
-    const block = live.current.blocks.find((b) => b.location.href === href);
-    if (block) await go(block.location);
+    if (href) await go({ type: "epub", href });
   };
   const clear = () => {
     syncTarget.current = undefined;
@@ -252,29 +273,19 @@ export function EPUBReadingView({
     }
   };
   useEffect(() => {
-    const controller = new AbortController();
-    void api
-      .epubBlocks(doc.id)
-      .then((items) => {
-        if (controller.signal.aborted) return;
-        setBlocks(items);
-        engine.current?.setEPUBBlocks?.(items);
-        setChapter((current) =>
-          items.some((b) => b.location.href === current)
-            ? current
-            : (items[0]?.location.href ?? ""),
-        );
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message);
-      });
     return () => {
-      controller.abort();
       syncTarget.current = undefined;
       cancelAnimationFrame(scrollFrame.current);
       cancelAnimationFrame(modeFrame.current);
     };
   }, [doc.id]);
+  useLayoutEffect(() => {
+    const anchor = viewportAnchor.current;
+    viewportAnchor.current = undefined;
+    const node = anchor && targetNode(anchor.id);
+    if (node && pane.current)
+      pane.current.scrollTop += node.getBoundingClientRect().top - anchor.top;
+  }, [blocks]);
   useEffect(() => {
     if (pendingFollow.current) follow(pendingFollow.current);
   }, [chapter, blocks, mode]);
@@ -376,6 +387,13 @@ export function EPUBReadingView({
         (b) => b.id === node?.dataset.translationBlock,
       );
       if (block) {
+        if (
+          live.current.mode === "translation" &&
+          block.location.href !== live.current.chapter
+        )
+          void engine.current
+            ?.goTo(block.location)
+            .catch((e) => toast.error(e.message));
         updateLocation(block.location);
         void syncSource(block.location);
       }
@@ -395,7 +413,7 @@ export function EPUBReadingView({
         const block = epubBlocksAt(target, live.current.blocks)[0];
         if (block) follow(block.id);
       }
-      if (value !== "translation" && target.href)
+      if (target.href)
         void engine.current?.goTo(target).catch((e) => toast.error(e.message));
     });
   };
@@ -443,7 +461,6 @@ export function EPUBReadingView({
                   position.current = initial;
                   setChapter(initial.href.split("#")[0]);
                 }
-                adapter.setEPUBBlocks?.(live.current.blocks);
                 const overrides: Partial<ReaderAdapter> = {
                   goTo: go,
                   next: () => step(1),
@@ -478,6 +495,21 @@ export function EPUBReadingView({
               }}
               events={{
                 ...events,
+                epubBlocksChanged: (items) => {
+                  const top = pane.current?.getBoundingClientRect().top ?? 0;
+                  const node = Array.from(
+                    pane.current?.querySelectorAll<HTMLElement>(
+                      "[data-translation-block]",
+                    ) ?? [],
+                  ).find((n) => n.getBoundingClientRect().bottom > top);
+                  if (node)
+                    viewportAnchor.current = {
+                      id: node.dataset.translationBlock!,
+                      top: node.getBoundingClientRect().top,
+                    };
+                  live.current.blocks = items;
+                  setBlocks(items);
+                },
                 epubInteraction: () => {
                   side.current = "source";
                   syncTarget.current = undefined;
@@ -495,7 +527,7 @@ export function EPUBReadingView({
                   )
                     return;
                   position.current = location;
-                  setChapter(location.href);
+                  setChapter(location.href.split("#")[0]);
                   live.current.events.location(location, percent);
                 },
                 epubBlockHover: (id) => {
@@ -632,12 +664,11 @@ export function EPUBReadingView({
               );
             }}
           >
-            {(error ||
-              streamError ||
+            {(streamError ||
               processing?.status === "waiting" ||
               processing?.status === "failed") && (
               <div className="translation-warning">
-                {error || streamError || processing?.detail}
+                {streamError || processing?.detail}
                 {processing?.status === "failed" && (
                   <Button
                     size="sm"
@@ -655,10 +686,9 @@ export function EPUBReadingView({
             )}
             {!blocks.length && (
               <p className="translation-warning">
-                {error ||
-                  (processing?.status === "complete"
-                    ? "此书没有可翻译的正文文字"
-                    : "正在读取正文段落…")}
+                {processing?.status === "complete"
+                  ? "此书没有可翻译的正文文字"
+                  : "正在读取正文段落…"}
               </p>
             )}
             {visible.map((block) => (

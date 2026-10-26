@@ -324,9 +324,10 @@ export const api = {
     id: string,
     signal: AbortSignal,
     onEvent: (event: TranslationEvent) => void,
+    hrefs?: string[],
   ) => {
     const response = await diagnosticFetch(
-      `/api/documents/${encodeURIComponent(id)}/translations/stream`,
+      `/api/documents/${encodeURIComponent(id)}/translations/stream${hrefs?.length ? `?${new URLSearchParams(hrefs.map((href) => ["href", href]))}` : ""}`,
       {
         headers: {
           Authorization: `Bearer ${sessionToken}`,
@@ -346,11 +347,14 @@ export const api = {
   },
   epubChapters: (id: string, signal?: AbortSignal) =>
     request<import("@neoread/core").EPUBChapters>(
-      `/api/documents/${encodeURIComponent(id)}/epub-chapters`,
+      `/api/documents/${encodeURIComponent(id)}/epub-chapters?summary=1`,
       { signal },
     ),
   epubChapter: (id: string, href: string, signal?: AbortSignal) =>
-    request<{ html: string }>(
+    request<{
+      html: string;
+      blocks?: import("@neoread/core").EPUBReadingBlock[];
+    }>(
       `/api/documents/${encodeURIComponent(id)}/epub-chapter?href=${encodeURIComponent(href)}`,
       { signal },
     ),

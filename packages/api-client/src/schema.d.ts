@@ -2653,7 +2653,10 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Return spine metadata with empty blocks and estimated character counts, without reading chapter bodies. */
+                    summary?: "1";
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -2717,6 +2720,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
+                            blocks?: components["schemas"]["EPUBReadingBlock"][];
                             /** @description Server sanitized reader-mode HTML; no publisher CSS */
                             html: string;
                         };
@@ -3296,7 +3300,10 @@ export interface paths {
         /** @description Authenticated translation subscription. Sends a snapshot on connection, then flushes each persisted translation block immediately. Reconnect obtains a new snapshot. Does not start or cancel generation. */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description EPUB chapter hrefs. When provided, only these chapters are parsed and their translations subscribed to. */
+                    href?: string[];
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -5437,6 +5444,7 @@ export interface components {
             start?: number;
             end?: number;
             endBlockId?: string;
+            endHref?: string;
             locator?: string;
             progression?: number;
             quote?: string;
