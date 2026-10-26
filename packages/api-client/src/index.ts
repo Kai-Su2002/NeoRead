@@ -596,6 +596,11 @@ export const api = {
       headers: { "Content-Type": "image/jpeg" },
       body: image,
     }),
+  migrateLegacyAnnotations: () =>
+    request<{ migrated: number; skipped: number; failed: number }>(
+      "/api/annotations/migrate-legacy",
+      { method: "POST" },
+    ),
   recoverAnnotations: (id: string, force = false) =>
     request<{ checked: boolean }>(`/api/documents/${id}/annotations/recover`, {
       method: "POST",

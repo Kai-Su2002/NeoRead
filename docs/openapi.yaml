@@ -500,6 +500,50 @@
                 },
             },
         },
+      "/api/annotations/migrate-legacy":
+        {
+          "post":
+            {
+              "summary": "Manually migrate legacy annotations; opening documents never triggers migration",
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "Migration result; unmatched annotations are preserved",
+                      "content":
+                        {
+                          "application/json":
+                            {
+                              "schema":
+                                {
+                                  "type": "object",
+                                  "required": ["migrated", "skipped", "failed"],
+                                  "properties":
+                                    {
+                                      "migrated":
+                                        {
+                                          "type": "integer",
+                                          "description": "Original annotations migrated",
+                                        },
+                                      "skipped":
+                                        {
+                                          "type": "integer",
+                                          "description": "Legacy annotations left unchanged",
+                                        },
+                                      "failed":
+                                        {
+                                          "type": "integer",
+                                          "description": "Documents that failed to migrate",
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                  "500": { "description": "Unable to read legacy annotations" },
+                },
+            },
+        },
       "/api/documents/{id}/annotations/recover":
         {
           "post":
@@ -2935,7 +2979,8 @@
                                 {
                                   "type": "object",
                                   "required": ["reparsed"],
-                                  "properties": { "reparsed": { "type": "boolean" } },
+                                  "properties":
+                                    { "reparsed": { "type": "boolean" } },
                                 },
                             },
                         },

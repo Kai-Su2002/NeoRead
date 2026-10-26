@@ -18,6 +18,7 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
+import { LegacyAnnotationMigration } from "./LegacyAnnotationMigration";
 import { DiagnosticExport } from "./DiagnosticExport";
 import { LibraryLocationSettings } from "./LibraryLocationSettings";
 import { CommandLineSettings } from "./CommandLineSettings";
@@ -759,6 +760,9 @@ export function Settings({
             {window.neoreadDesktop?.proxySettings && (
               <ProxySettings open={open} />
             )}
+            <section>
+              <LegacyAnnotationMigration />
+            </section>
             <section>
               <div className="flex items-start justify-between gap-3">
                 <h3 className="shrink-0 pt-2 text-sm font-medium">本地日志</h3>

@@ -483,6 +483,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/annotations/migrate-legacy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Manually migrate legacy annotations; opening documents never triggers migration */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Migration result; unmatched annotations are preserved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Original annotations migrated */
+                            migrated: number;
+                            /** @description Legacy annotations left unchanged */
+                            skipped: number;
+                            /** @description Documents that failed to migrate */
+                            failed: number;
+                        };
+                    };
+                };
+                /** @description Unable to read legacy annotations */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{id}/annotations/recover": {
         parameters: {
             query?: never;

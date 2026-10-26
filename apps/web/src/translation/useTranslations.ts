@@ -25,7 +25,13 @@ export function useTranslations(documentId: string, hrefs?: string[]) {
             retryDelay = 500;
             setError("");
             if (event.event === "snapshot") setTranslations(event.data);
-            else
+            else {
+              if (event.data.status === "complete")
+                window.dispatchEvent(
+                  new CustomEvent("neoread:annotations-changed", {
+                    detail: { documentId },
+                  }),
+                );
               setTranslations((current) => {
                 const index = current.findIndex(
                   (b) => b.blockId === event.data.blockId,
@@ -33,6 +39,7 @@ export function useTranslations(documentId: string, hrefs?: string[]) {
                 if (index < 0) return [...current, event.data];
                 return current.map((b, i) => (i === index ? event.data : b));
               });
+            }
           },
           scope?.split("\0"),
         );

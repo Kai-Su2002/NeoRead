@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 )
@@ -149,7 +150,11 @@ func (s *Server) retryFailedTranslations(documentID string) error {
 	return nil
 }
 
-func (s *Server) saveTranslation(documentID string, t TranslationBlock) error {
+func (s *Server) saveTranslation(documentID string, t TranslationBlock, source ...translationInput) error {
+	if t.Status == "complete" {
+		s.annotationMu.Lock()
+		defer s.annotationMu.Unlock()
+	}
 	s.translationMu.Lock()
 	defer s.translationMu.Unlock()
 	body, err := json.Marshal(t)
@@ -161,6 +166,13 @@ func (s *Server) saveTranslation(documentID string, t TranslationBlock) error {
 		return err
 	}
 	defer tx.Rollback()
+	changed := 0
+	if t.Status == "complete" {
+		changed, err = reconcileRetranslatedAnnotations(tx, documentID, t, source...)
+		if err != nil {
+			return err
+		}
+	}
 	if _, err = tx.Exec(`INSERT INTO translations(document_id,block_id,source_hash,status,body) VALUES(?,?,?,?,?) ON CONFLICT(document_id,block_id,source_hash) DO UPDATE SET status=excluded.status,body=excluded.body`, documentID, t.BlockID, t.SourceHash, t.Status, string(body)); err != nil {
 		return err
 	}
@@ -184,6 +196,9 @@ func (s *Server) saveTranslation(documentID string, t TranslationBlock) error {
 	}
 	if err = tx.Commit(); err != nil {
 		return err
+	}
+	if changed > 0 {
+		s.diagnosticEvent(slog.LevelInfo, "annotation.retranslation.reconcile", "documentId", documentID, "count", changed)
 	}
 	s.publishTranslation(documentID, visible)
 	return nil

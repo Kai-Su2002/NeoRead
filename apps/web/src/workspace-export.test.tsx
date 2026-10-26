@@ -196,12 +196,10 @@ it.each(["取消", "Close"])(
   },
 );
 
-it("checks annotations once on opening, before loading marks, not on progress updates", async () => {
+it("loads saved annotations without running recovery on open or progress updates", async () => {
   await act(async () => render(0));
-  expect(api.recoverAnnotations).toHaveBeenCalledExactlyOnceWith(doc.id);
-  expect(
-    vi.mocked(api.recoverAnnotations).mock.invocationCallOrder[0],
-  ).toBeLessThan(vi.mocked(api.annotations).mock.invocationCallOrder[0]);
+  expect(api.annotations).toHaveBeenCalledWith(doc.id);
+  expect(api.recoverAnnotations).not.toHaveBeenCalled();
   await act(async () => render(1));
-  expect(api.recoverAnnotations).toHaveBeenCalledTimes(1);
+  expect(api.recoverAnnotations).not.toHaveBeenCalled();
 });
