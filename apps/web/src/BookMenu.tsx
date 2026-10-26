@@ -4,6 +4,7 @@ import {
   ChartColumn,
   FileDown,
   Pencil,
+  RefreshCw,
   Trash2,
 } from "lucide-react";
 import type { Document, LibraryMode } from "@neoread/core";
@@ -16,6 +17,7 @@ import {
   DropdownMenuSeparator,
 } from "@neoread/ui/components/dropdown-menu";
 import { exportAnnotatedPDFWithToast } from "./annotated-pdf-export";
+import { reparseDocument } from "./reparse-document";
 
 const kits = {
   context: { Item: ContextMenuItem, Separator: ContextMenuSeparator },
@@ -60,6 +62,10 @@ export function BookMenuItems({
           编辑文档信息
         </K.Item>
       )}
+      <K.Item onClick={() => void reparseDocument(doc)}>
+        <RefreshCw />
+        重新解析
+      </K.Item>
       {doc.type === "pdf" && (
         <K.Item onClick={() => void exportAnnotatedPDFWithToast(doc)}>
           <FileDown />

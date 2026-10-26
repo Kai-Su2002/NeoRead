@@ -68,6 +68,8 @@ export type EPUBLocation = {
   start?: number;
   end?: number;
   endBlockId?: string;
+  /** Chapter containing the end of a cross-chapter selection. */
+  endHref?: string;
   type: "epub";
   href: string;
   sentenceLink?: SentenceLink;
@@ -459,6 +461,8 @@ export interface ReaderEvents {
   internalLink?: (origin: DocumentLocation) => void;
   epubInteraction?: () => void;
   epubReadingAnchor?: (blockId: string) => void;
+  /** Only paragraphs retained by the EPUB reader window. */
+  epubBlocksChanged?: (blocks: EPUBReadingBlock[]) => void;
   /** Pointer over an EPUB paragraph, or null when it leaves. */
   epubBlockHover?: (blockId: string | null) => void;
   /** A click on an EPUB paragraph; the default centers it in the source. */
@@ -501,6 +505,7 @@ export interface ReaderAdapter {
   setBlocks?(blocks: PDFBlock[]): void;
   setSearchBlocks?(blockIds: string[]): void;
   setEPUBBlocks?(blocks: EPUBReadingBlock[]): void;
+  getEPUBChapters?(): EPUBChapter[];
   focusEPUBLocations?(locations: EPUBLocation[]): Promise<void>;
   hoverBlock?(blockId: string | null): void;
   /** Re-renders a PDF block from vectors; `width` targets device pixels. */

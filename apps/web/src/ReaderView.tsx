@@ -52,6 +52,9 @@ export function ReaderView({
         epubInteraction: () => {
           if (!disposed) latest.current.events.epubInteraction?.();
         },
+        epubBlocksChanged: (blocks) => {
+          if (!disposed) latest.current.events.epubBlocksChanged?.(blocks);
+        },
         epubReadingAnchor: (id) => {
           if (!disposed) latest.current.events.epubReadingAnchor?.(id);
         },

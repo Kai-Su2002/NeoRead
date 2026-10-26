@@ -1,3 +1,4 @@
+import { useAnnotationUpdates } from "./useAnnotationUpdates";
 import { webSearchEnabled } from "./chat/web-search";
 import { NavigationTree } from "./NavigationTree";
 import { useShortcut } from "./shortcuts/shortcuts";
@@ -248,8 +249,6 @@ export function Workspace({
     useState<ReaderSelection | null>(null);
   const [selection, setSelection] = useState<ReaderSelection | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const recoveryDocument = useRef(doc.id);
-  recoveryDocument.current = doc.id;
   const annotationSaving = useRef(false);
   const [noteSaving, setNoteSaving] = useState(false);
   const selectionClipboard = useSelectionClipboard(theme.autoCopySelection);
@@ -483,6 +482,17 @@ export function Workspace({
     setSearchedQuery("");
     setSearching(false);
   }, [doc.id]);
+  useAnnotationUpdates(
+    doc.id,
+    (items) => {
+      setAnnotations(items);
+      setAnnotationsLoaded(true);
+    },
+    () => {
+      setAnnotations([]);
+      setAnnotationsLoaded(false);
+    },
+  );
   useShortcut("readerLeft", () => setLeft(!left));
   useShortcut("readerRight", () => setRight(!right));
   useShortcut("search", () => {
@@ -491,24 +501,11 @@ export function Workspace({
     requestAnimationFrame(() => searchInput.current?.focus());
   });
   useEffect(() => {
-    let alive = true;
     session.activate();
     abort.current = null;
     if (currentSession) void session.load();
     setSending(false);
-    api
-      .recoverAnnotations(doc.id)
-      .catch((e) => toast.error(e.message))
-      .then(() => api.annotations(doc.id))
-      .then((a) => {
-        if (alive) {
-          setAnnotations(a);
-          setAnnotationsLoaded(true);
-        }
-      })
-      .catch((e) => toast.error(e.message));
     return () => {
-      alive = false;
       sendSerial.current++;
       abort.current?.abort();
       // A viewer switch must not abort its independently owned run.
@@ -1819,20 +1816,6 @@ export function Workspace({
                   onResolve={(a, resolved) => void resolveQuestion(a, resolved)}
                   onShowAnswer={showAnswer}
                   onExport={() => setExportingNotes(true)}
-                  onRecover={async () => {
-                    try {
-                      const result = await api.recoverAnnotations(doc.id, true);
-                      if (!result.checked) {
-                        toast.error("请等待文档解析和翻译完成后再定位批注");
-                        return;
-                      }
-                      const items = await api.annotations(doc.id);
-                      if (recoveryDocument.current === doc.id)
-                        setAnnotations(items);
-                    } catch (e) {
-                      toast.error((e as Error).message);
-                    }
-                  }}
                 />
               </TabsContent>
             </Tabs>

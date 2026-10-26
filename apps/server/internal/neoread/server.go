@@ -43,6 +43,8 @@ type Server struct {
 	endnoteScans           map[string]*endnoteScan
 	annotationCheckLocks   sync.Map
 	annotationMu           sync.Mutex
+	annotationRevisions    map[string]string
+	annotationSubscribers  map[string]map[chan struct{}]struct{}
 	annotationHistory      []annotationChange
 	codexChat              codexChatCache
 	documentCodex          documentCodexCache
@@ -57,6 +59,7 @@ type Server struct {
 	documentClosed         bool
 	documentTasks          map[string]map[*documentTask]struct{}
 	deletingDocuments      map[string]bool
+	reparsingDocuments     map[string]bool
 	importMu               sync.Mutex
 	configMu               sync.Mutex
 	translationMu          sync.Mutex
@@ -132,6 +135,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/import/endnote", s.importEndNote)
 	mux.HandleFunc("POST /api/import/zotero", s.importZotero)
 	mux.HandleFunc("POST /api/documents", s.importDocument)
+	mux.HandleFunc("POST /api/documents/{id}/reparse", s.reparseDocument)
 	mux.HandleFunc("POST /api/documents/resolve", s.resolveDocument)
 	mux.HandleFunc("GET /api/documents/{id}/navigation", s.documentNavigation)
 	mux.HandleFunc("PUT /api/documents/{id}/navigation", s.saveDocumentNavigation)
@@ -176,7 +180,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/documents/{id}/classification", s.retryClassification)
 	mux.HandleFunc("POST /api/documents/{id}/annotations/undo", s.undoAnnotation)
 	mux.HandleFunc("GET /api/documents/{id}/annotations", s.annotations)
+	mux.HandleFunc("GET /api/documents/{id}/annotations/stream", s.streamAnnotationChanges)
 	mux.HandleFunc("POST /api/documents/{id}/annotations/recover", s.recoverAnnotations)
+	mux.HandleFunc("POST /api/annotations/migrate-legacy", s.migrateLegacyAnnotations)
 	mux.HandleFunc("POST /api/documents/{id}/annotations", s.recordAnnotation(s.saveAnnotation))
 	mux.HandleFunc("PATCH /api/documents/{id}/annotations/{annotation}", s.recordAnnotation(s.updateAnnotationNote))
 	mux.HandleFunc("DELETE /api/documents/{id}/annotations/{annotation}", s.recordAnnotation(func(w http.ResponseWriter, r *http.Request) {
