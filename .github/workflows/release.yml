@@ -1,103 +1,70 @@
 name: Release installers
-
 on:
-  release:
-    types: [published]
   workflow_dispatch:
-
 permissions:
-  contents: read
-
-concurrency:
-  group: release-${{ github.event.release.tag_name || github.ref }}
-  cancel-in-progress: false
-
+  contents: write
 jobs:
-  prepare:
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      actions: read
-    outputs:
-      sha: ${{ steps.source.outputs.sha }}
-      verified: ${{ steps.ci.outputs.verified }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event.release.tag_name || github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "22"
-      - name: Validate versions and pin source commit
-        id: source
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: node scripts/release-source.mjs
-
-      - name: Reuse successful CI for this exact source commit
-        id: ci
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          SOURCE_SHA: ${{ steps.source.outputs.sha }}
-        run: |
-          verified=$(gh api --method GET "repos/$GH_REPO/actions/workflows/ci.yml/runs" \
-            -f head_sha="$SOURCE_SHA" -f event=push -f status=success -f per_page=100 \
-            --jq '.workflow_runs | any(.head_sha == env.SOURCE_SHA and .conclusion == "success" and .event == "push" and .head_repository.full_name == env.GH_REPO)')
-          echo "verified=$verified" >> "$GITHUB_OUTPUT"
-          echo "Reuse successful CI for $SOURCE_SHA: $verified" >> "$GITHUB_STEP_SUMMARY"
-
-  checks:
-    needs: prepare
-    if: needs.prepare.outputs.verified != 'true'
-    uses: ./.github/workflows/ci.yml
-    with:
-      ref: ${{ needs.prepare.outputs.sha }}
-
-  desktop:
-    needs: [prepare, checks]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' && (needs.checks.result == 'success' || needs.checks.result == 'skipped') }}
-    uses: ./.github/workflows/build.yml
-    secrets: inherit
-    with:
-      ref: ${{ needs.prepare.outputs.sha }}
-      release-tag: ${{ github.event.release.tag_name || '' }}
-      mac-only: ${{ contains(github.event.release.body, '<!-- neoread:mac-only -->') }}
-
-  publish:
-    needs: [prepare, desktop]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.desktop.result == 'success' }}
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
+  windows-benchmark:
+    runs-on: windows-2022
+    timeout-minutes: 45
     env:
-      MAC_ONLY: ${{ contains(github.event.release.body, '<!-- neoread:mac-only -->') }}
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      RELEASE_TAG: v0.9.2
+      BENCH_TAG: bench-windows-20261026
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ needs.prepare.outputs.sha }}
+          ref: d23aad55635cb371a806626406a7b062512e9f6a
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - name: Record hardware and source
+        shell: pwsh
+        run: |
+          git rev-parse HEAD
+          Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors | ConvertTo-Json -Compress
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "22"
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+          cache: pnpm
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          pattern: neoread-*
-          path: release
-          merge-multiple: true
-      - name: Verify complete installer set and generate checksums
-        run: node scripts/release-assets.mjs
-      - name: Store checksums for manual dry runs
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+          go-version-file: apps/server/go.mod
+          cache-dependency-path: apps/server/go.sum
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output "BENCH install_seconds=$($timer.Elapsed.TotalSeconds)"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
-          name: neoread-checksums
-          path: release/SHA256SUMS.txt
-      - name: Attach installers to the published release
-        if: github.event_name == 'release'
+          path: apps/processor/models
+          key: neoread-layout-model-${{ hashFiles('apps/processor/model.json') }}
+      - name: Build installers and verify packaged runtimes
+        shell: pwsh
+        run: |
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          pnpm package
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output "BENCH package_seconds=$($timer.Elapsed.TotalSeconds)"
+          Get-Item release/NeoRead-0.9.2-win-x64.exe | Select-Object Name,Length | ConvertTo-Json -Compress
+          Get-FileHash release/NeoRead-0.9.2-win-x64.exe -Algorithm SHA256 | ConvertTo-Json -Compress
+      - name: Upload installer directly to benchmark draft
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: node scripts/release-assets.mjs --upload
+        shell: pwsh
+        run: |
+          Copy-Item release/NeoRead-0.9.2-win-x64.exe release/cloud-win-x64.exe
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          gh release upload $env:BENCH_TAG release/cloud-win-x64.exe --repo cynicalight/NeoRead
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Output "BENCH release_upload_seconds=$($timer.Elapsed.TotalSeconds)"
+      - name: Store verified installer as Actions artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bench-windows-installer
+          path: release/NeoRead-0.9.2-win-x64.exe
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 3
