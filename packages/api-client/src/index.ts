@@ -448,6 +448,13 @@ export const api = {
       method: "DELETE",
     }),
   processing: () => request<Processing[]>("/api/processing"),
+  reparseDocument: (id: string) =>
+    request<{ reparsed: boolean }>(
+      `/api/documents/${encodeURIComponent(id)}/reparse`,
+      {
+        method: "POST",
+      },
+    ),
   process: (id: string) =>
     request<Processing>(`/api/documents/${id}/processing`, { method: "POST" }),
   blocks: (id: string) => request<PDFBlock[]>(`/api/documents/${id}/blocks`),

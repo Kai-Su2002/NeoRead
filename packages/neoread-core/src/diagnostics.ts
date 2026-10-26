@@ -150,6 +150,7 @@ export function diagnosticRoute(path: string): string {
     "messages",
     "settings",
     "processing",
+    "reparse",
     "providers",
     "translations",
     "stream",

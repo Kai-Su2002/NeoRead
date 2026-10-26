@@ -2908,6 +2908,53 @@
                 },
             },
         },
+      "/api/documents/{id}/reparse":
+        {
+          "post":
+            {
+              "description": "Rebuild the EPUB publication cache or PDF layout from the stored original while keeping document identity and user data.",
+              "parameters":
+                [
+                  {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": { "type": "string" },
+                  },
+                ],
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "Reparsed",
+                      "content":
+                        {
+                          "application/json":
+                            {
+                              "schema":
+                                {
+                                  "type": "object",
+                                  "required": ["reparsed"],
+                                  "properties": { "reparsed": { "type": "boolean" } },
+                                },
+                            },
+                        },
+                    },
+                  "default":
+                    {
+                      "description": "Error",
+                      "content":
+                        {
+                          "application/json":
+                            {
+                              "schema":
+                                { "$ref": "#/components/schemas/Error" },
+                            },
+                        },
+                    },
+                },
+            },
+        },
       "/api/documents/{id}/blocks":
         {
           "get":

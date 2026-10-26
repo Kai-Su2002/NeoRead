@@ -57,6 +57,7 @@ type Server struct {
 	documentClosed         bool
 	documentTasks          map[string]map[*documentTask]struct{}
 	deletingDocuments      map[string]bool
+	reparsingDocuments     map[string]bool
 	importMu               sync.Mutex
 	configMu               sync.Mutex
 	translationMu          sync.Mutex
@@ -132,6 +133,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/import/endnote", s.importEndNote)
 	mux.HandleFunc("POST /api/import/zotero", s.importZotero)
 	mux.HandleFunc("POST /api/documents", s.importDocument)
+	mux.HandleFunc("POST /api/documents/{id}/reparse", s.reparseDocument)
 	mux.HandleFunc("POST /api/documents/resolve", s.resolveDocument)
 	mux.HandleFunc("GET /api/documents/{id}/navigation", s.documentNavigation)
 	mux.HandleFunc("PUT /api/documents/{id}/navigation", s.saveDocumentNavigation)
