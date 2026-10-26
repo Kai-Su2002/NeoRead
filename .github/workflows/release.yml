@@ -4,12 +4,15 @@ on:
 permissions:
   contents: write
 jobs:
-  windows-benchmark:
-    runs-on: windows-2022
+  mac-benchmark:
+    runs-on: macos-15
     timeout-minutes: 45
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       RELEASE_TAG: v0.9.2
+      CSC_FOR_PULL_REQUEST: "true"
+      NEOREAD_MAC_SIGN_P12: ${{ secrets.NEOREAD_MAC_SIGN_P12 }}
+      NEOREAD_MAC_SIGN_P12_PASSWORD: ${{ secrets.NEOREAD_MAC_SIGN_P12_PASSWORD }}
       BENCH_TAG: bench-windows-20261026
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -17,10 +20,9 @@ jobs:
           ref: d23aad55635cb371a806626406a7b062512e9f6a
           persist-credentials: false
       - name: Record hardware and source
-        shell: pwsh
         run: |
           git rev-parse HEAD
-          Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors | ConvertTo-Json -Compress
+          system_profiler SPHardwareDataType | grep -E 'Model Name|Chip|Total Number of Cores|Memory' 
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -31,40 +33,26 @@ jobs:
           go-version-file: apps/server/go.mod
           cache-dependency-path: apps/server/go.sum
       - name: Install dependencies
-        shell: pwsh
         run: |
-          $timer = [Diagnostics.Stopwatch]::StartNew()
+          start=$SECONDS
           pnpm install --frozen-lockfile
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Write-Output "BENCH install_seconds=$($timer.Elapsed.TotalSeconds)"
+          echo "BENCH install_seconds=$((SECONDS-start))"
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: apps/processor/models
           key: neoread-layout-model-${{ hashFiles('apps/processor/model.json') }}
       - name: Build installers and verify packaged runtimes
-        shell: pwsh
         run: |
-          $timer = [Diagnostics.Stopwatch]::StartNew()
+          start=$SECONDS
           pnpm package
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Write-Output "BENCH package_seconds=$($timer.Elapsed.TotalSeconds)"
-          Get-Item release/NeoRead-0.9.2-win-x64.exe | Select-Object Name,Length | ConvertTo-Json -Compress
-          Get-FileHash release/NeoRead-0.9.2-win-x64.exe -Algorithm SHA256 | ConvertTo-Json -Compress
-      - name: Upload installer directly to benchmark draft
+          echo "BENCH package_seconds=$((SECONDS-start))"
+          shasum -a 256 release/NeoRead-0.9.2-mac-arm64.dmg release/NeoRead-0.9.2-mac-arm64.zip
+      - name: Upload installers directly to benchmark draft
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: pwsh
         run: |
-          Copy-Item release/NeoRead-0.9.2-win-x64.exe release/cloud-win-x64.exe
-          $timer = [Diagnostics.Stopwatch]::StartNew()
-          gh release upload $env:BENCH_TAG release/cloud-win-x64.exe --repo cynicalight/NeoRead
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Write-Output "BENCH release_upload_seconds=$($timer.Elapsed.TotalSeconds)"
-      - name: Store verified installer as Actions artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: bench-windows-installer
-          path: release/NeoRead-0.9.2-win-x64.exe
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 3
+          cp release/NeoRead-0.9.2-mac-arm64.dmg release/cloud-mac-arm64.dmg
+          cp release/NeoRead-0.9.2-mac-arm64.zip release/cloud-mac-arm64.zip
+          start=$SECONDS
+          gh release upload "$BENCH_TAG" release/cloud-mac-arm64.dmg release/cloud-mac-arm64.zip --repo cynicalight/NeoRead
+          echo "BENCH release_upload_seconds=$((SECONDS-start))"
