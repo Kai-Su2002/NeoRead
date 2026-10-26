@@ -1122,6 +1122,9 @@ export function Workspace({
           >
             <PanelLeft />
           </IconButton>
+          <IconButton label="文档概要" onClick={() => setOverviewOpen(true)}>
+            <BookOpen />
+          </IconButton>
           <span className="toolbar-divider" />
           <span className="neoread-title" title={doc.title}>
             {doc.title}
@@ -1140,9 +1143,6 @@ export function Workspace({
               返回阅读位置
             </Button>
           )}
-          <IconButton label="文档概要" onClick={() => setOverviewOpen(true)}>
-            <BookOpen />
-          </IconButton>
           <div ref={setReadingToolbar} data-tour="reading-modes" />
           <span className="toolbar-divider" />
           <div ref={setSourceAutoCenterToolbar} />
