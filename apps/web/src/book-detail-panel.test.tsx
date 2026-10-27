@@ -59,6 +59,7 @@ vi.mock("./BookDetail", () => ({
 vi.mock("./DocumentManagement", () => ({
   DocumentEditor: () => null,
   LibraryFilterBar: () => null,
+  LibraryTagFilters: () => null,
 }));
 vi.mock("./LargePaperDialog", () => ({
   LargePaperConfirmation: () => null,

@@ -123,7 +123,7 @@ export function LibraryFilterBar({
       <span className="text-xs text-muted-foreground" role="status">
         {count} 份文档
       </span>
-      <div className="ml-auto flex gap-1">
+      <div className="flex gap-1">
         <Button
           size="icon-sm"
           variant={view === "grid" ? "secondary" : "ghost"}
@@ -143,29 +143,41 @@ export function LibraryFilterBar({
           <List />
         </Button>
       </div>
-      {filters.tags.length > 0 && (
-        <div className="flex w-full flex-wrap items-center gap-1">
-          <span className="text-xs text-muted-foreground">同时包含</span>
-          {filters.tags.map((tag) => (
-            <Badge key={tag} variant="secondary">
-              {tags.find((t) => t.toLowerCase() === tag) ?? tag}
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                aria-label={`取消筛选 ${tag}`}
-                onClick={() =>
-                  onChange({
-                    ...filters,
-                    tags: filters.tags.filter((t) => t !== tag),
-                  })
-                }
-              >
-                <X />
-              </Button>
-            </Badge>
-          ))}
-        </div>
-      )}
+    </div>
+  );
+}
+export function LibraryTagFilters({
+  documents,
+  filters,
+  onChange,
+}: {
+  documents: Document[];
+  filters: LibraryFilters;
+  onChange: (value: LibraryFilters) => void;
+}) {
+  if (!filters.tags.length) return null;
+  const tags = libraryTags(documents);
+  return (
+    <div className="library-tag-filters">
+      <span className="text-xs text-muted-foreground">同时包含</span>
+      {filters.tags.map((tag) => (
+        <Badge key={tag} variant="secondary">
+          {tags.find((t) => t.toLowerCase() === tag) ?? tag}
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            aria-label={`取消筛选 ${tag}`}
+            onClick={() =>
+              onChange({
+                ...filters,
+                tags: filters.tags.filter((t) => t !== tag),
+              })
+            }
+          >
+            <X />
+          </Button>
+        </Badge>
+      ))}
     </div>
   );
 }

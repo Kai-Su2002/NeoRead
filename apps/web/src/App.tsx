@@ -65,7 +65,7 @@ import { flushProgress } from "./progress";
 import { useProcessing } from "./ProcessingStatus";
 import { useUpdateProgress } from "./update-progress";
 import { useResolvedTheme } from "./appearance";
-import { LibraryFilterBar } from "./DocumentManagement";
+import { LibraryFilterBar, LibraryTagFilters } from "./DocumentManagement";
 import { TagBoards } from "./TagBoards";
 import { LibraryDocuments } from "./LibraryDocuments";
 import { BookDetail, saveBookDetailWidth } from "./BookDetail";
@@ -703,15 +703,25 @@ export function App() {
                       />
                     </div>
                   ) : filter === "trash" ? null : (
-                    <Button
-                      variant={editingLibrary ? "secondary" : "outline"}
-                      aria-pressed={editingLibrary}
-                      disabled={!filtered.length && !editingLibrary}
-                      onClick={() => setEditingLibrary(!editingLibrary)}
-                    >
-                      {editingLibrary ? <Check /> : <CheckSquare />}
-                      {editingLibrary ? "完成" : "批量"}
-                    </Button>
+                    <div className="library-topbar-actions">
+                      <LibraryFilterBar
+                        documents={documents}
+                        filters={filters}
+                        onChange={setFilters}
+                        view={libraryView}
+                        onViewChange={setLibraryView}
+                        count={filtered.length}
+                      />
+                      <Button
+                        variant={editingLibrary ? "secondary" : "outline"}
+                        aria-pressed={editingLibrary}
+                        disabled={!filtered.length && !editingLibrary}
+                        onClick={() => setEditingLibrary(!editingLibrary)}
+                      >
+                        {editingLibrary ? <Check /> : <CheckSquare />}
+                        {editingLibrary ? "完成" : "批量"}
+                      </Button>
+                    </div>
                   )}
                 </header>
                 <div className="book-library-body" ref={setLibraryBody}>
@@ -731,13 +741,10 @@ export function App() {
                         </div>
                       )}
                       {filter !== "tags" && filter !== "trash" && (
-                        <LibraryFilterBar
+                        <LibraryTagFilters
                           documents={documents}
                           filters={filters}
                           onChange={setFilters}
-                          view={libraryView}
-                          onViewChange={setLibraryView}
-                          count={filtered.length}
                         />
                       )}
                       {processingError && (
