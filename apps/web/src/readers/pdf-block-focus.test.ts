@@ -262,25 +262,28 @@ it("remeasures a resized panel on every repeated click and caps automatic zoom a
     s.nav.destroy();
   }
 });
-it("fits tall images within the viewport and lets a new click replace unfinished focus", async () => {
-  const s = setup();
-  try {
-    const first = s.nav.focusBlock("a");
-    await vi.advanceTimersByTimeAsync(96);
-    const before = s.rect("image");
-    const second = s.nav.focusBlock("image");
-    expect(s.rect("image")).toEqual(before);
-    await finish(second);
-    await first;
-    centered(s, "image");
-    expect(s.rect("image").height).toBeLessThanOrEqual(s.size.height - 32);
-    expect(s.rect("image").width).toBeLessThanOrEqual(s.size.width - 32);
-    expect(s.focus).toHaveBeenCalledWith("image");
-    expect(s.focus).toHaveBeenLastCalledWith(null);
-  } finally {
-    s.nav.destroy();
-  }
-});
+it.each(["source", "parallel"] as const)(
+  "fits tall images within the %s viewport and lets a new click replace unfinished focus",
+  async (mode) => {
+    const s = setup();
+    try {
+      const first = s.nav.focusBlock("a");
+      await vi.advanceTimersByTimeAsync(96);
+      const before = s.rect("image");
+      const second = s.nav.focusBlock("image", mode);
+      expect(s.rect("image")).toEqual(before);
+      await finish(second);
+      await first;
+      centered(s, "image");
+      expect(s.rect("image").height).toBeLessThanOrEqual(s.size.height - 32);
+      expect(s.rect("image").width).toBeLessThanOrEqual(s.size.width - 32);
+      expect(s.focus).toHaveBeenCalledWith("image");
+      expect(s.focus).toHaveBeenLastCalledWith(null);
+    } finally {
+      s.nav.destroy();
+    }
+  },
+);
 it("cancels pending page geometry on manual zoom and uses fresh dimensions when page loading completes", async () => {
   const s = setup();
   try {
