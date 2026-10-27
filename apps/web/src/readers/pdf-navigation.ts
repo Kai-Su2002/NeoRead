@@ -170,7 +170,13 @@ export class PDFReadingNavigation {
                   block.bounds.width),
             ),
           )
-        : 1.5;
+        : Math.min(
+            1.5,
+            Math.floor(
+              ((this.host.clientWidth - 32) * this.viewer.currentScale * 100) /
+                (node.getBoundingClientRect().width * block.bounds.width),
+            ) / 100,
+          );
       const initialScale = this.viewer.currentScale;
       const initial = node.getBoundingClientRect(),
         view = this.host.getBoundingClientRect();
