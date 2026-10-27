@@ -262,7 +262,7 @@ it("remeasures a resized panel on every repeated click and caps automatic zoom a
     s.nav.destroy();
   }
 });
-it("top-aligns tall images and lets a new click replace an unfinished focus", async () => {
+it("fits tall images within the viewport and lets a new click replace unfinished focus", async () => {
   const s = setup();
   try {
     const first = s.nav.focusBlock("a");
@@ -273,7 +273,8 @@ it("top-aligns tall images and lets a new click replace an unfinished focus", as
     await finish(second);
     await first;
     centered(s, "image");
-    expect(s.rect("image").top).toBe(50);
+    expect(s.rect("image").height).toBeLessThanOrEqual(s.size.height - 32);
+    expect(s.rect("image").width).toBeLessThanOrEqual(s.size.width - 32);
     expect(s.focus).toHaveBeenCalledWith("image");
     expect(s.focus).toHaveBeenLastCalledWith(null);
   } finally {

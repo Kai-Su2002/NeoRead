@@ -158,11 +158,15 @@ export class PDFReadingNavigation {
         return false;
       // PDF viewport dimensions are points; PDF.js displays them at 96 / 72 CSS pixels.
       // Read the current panel width after any asynchronous page load, on every click.
-      const availableWidth = this.host.clientWidth - 32;
-      const blockWidthAtScaleOne =
-        page.getViewport({ scale: 1 }).width * (96 / 72) * block.bounds.width;
-      const fitScale =
-        Math.floor((availableWidth / blockWidthAtScaleOne) * 100) / 100;
+      const viewport = page.getViewport({ scale: 1 });
+      const widthScale =
+        (this.host.clientWidth - 32) /
+        (viewport.width * (96 / 72) * block.bounds.width);
+      const heightScale = block.image
+        ? (this.host.clientHeight - 32) /
+          (viewport.height * (96 / 72) * block.bounds.height)
+        : Infinity;
+      const fitScale = Math.floor(Math.min(widthScale, heightScale) * 100) / 100;
       const maxScale = layout === "source" ? 1.5 : 2;
       const scale = Math.min(maxScale, Math.max(0.1, fitScale));
       const initialScale = this.viewer.currentScale;
