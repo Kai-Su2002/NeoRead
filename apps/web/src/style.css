@@ -692,7 +692,8 @@ kbd {
   padding: 3px 8px 56px;
   user-select: none;
 }
-.navigation-selection-toolbar {
+.navigation-selection-toolbar,
+.navigation-collapse-toolbar {
   position: absolute;
   bottom: 12px;
   left: 12px;
@@ -706,8 +707,16 @@ kbd {
   color: var(--foreground);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.08);
 }
+.navigation-collapse-toolbar {
+  left: auto;
+  right: 12px;
+}
+.navigation-collapse-toolbar > button {
+  border-radius: 50%;
+}
 @supports (backdrop-filter: blur(12px)) {
-  .navigation-selection-toolbar {
+  .navigation-selection-toolbar,
+  .navigation-collapse-toolbar {
     background: color-mix(in srgb, var(--background) 80%, transparent);
     backdrop-filter: blur(12px);
   }

@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bookmark, ChevronRight, SquareCheck, Trash2, X } from "lucide-react";
+import {
+  Bookmark,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  SquareCheck,
+  Trash2,
+  X,
+} from "lucide-react";
 import { api } from "@neoread/api";
 import type {
   Annotation,
@@ -145,6 +153,13 @@ export function NavigationTree({
             .at(-1)?.id
         : flat.find(sameSection)?.id;
   const disabled = !loaded || saving || resolving;
+  const branches = flat.filter((item) => item.children.length > 0);
+  function setAllCollapsed(collapsed: boolean) {
+    const entries = { ...state.entries };
+    for (const item of branches)
+      entries[item.id] = { ...entries[item.id], collapsed };
+    void save({ ...state, entries });
+  }
   async function change(id: string, patch: NavigationEdit) {
     return save(editNavigation(state, id, patch));
   }
@@ -472,6 +487,34 @@ export function NavigationTree({
           )}
         </div>
       </ScrollArea>
+      {!selecting && (
+        <div
+          className="navigation-collapse-toolbar"
+          role="group"
+          aria-label="目录展开与折叠"
+        >
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="全部折叠"
+            title="全部折叠"
+            disabled={disabled || !branches.some((item) => !item.collapsed)}
+            onClick={() => setAllCollapsed(true)}
+          >
+            <ChevronsDownUp className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="全部展开"
+            title="全部展开"
+            disabled={disabled || !branches.some((item) => item.collapsed)}
+            onClick={() => setAllCollapsed(false)}
+          >
+            <ChevronsUpDown className="size-4" />
+          </Button>
+        </div>
+      )}
       <div
         className={`navigation-selection-toolbar ${selecting ? "is-selecting" : ""}`}
         role="group"
