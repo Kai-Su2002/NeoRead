@@ -151,32 +151,20 @@ export class PDFReadingNavigation {
     const operation = ++this.operation;
     this.moving = true;
     try {
-      const page =
-        layout === "parallel" ? await this.page(block.page) : undefined;
+      const page = await this.page(block.page);
       if (this.disposed || operation !== this.operation) return false;
       const node = this.pageNode(block.page);
       if (!node || !this.host.clientWidth || !this.host.clientHeight)
         return false;
       // PDF viewport dimensions are points; PDF.js displays them at 96 / 72 CSS pixels.
       // Read the current panel width after any asynchronous page load, on every click.
-      const scale = page
-        ? Math.min(
-            2,
-            Math.max(
-              0.1,
-              (this.host.clientWidth - 32) /
-                (page.getViewport({ scale: 1 }).width *
-                  (96 / 72) *
-                  block.bounds.width),
-            ),
-          )
-        : Math.min(
-            1.5,
-            Math.floor(
-              ((this.host.clientWidth - 32) * this.viewer.currentScale * 100) /
-                (node.getBoundingClientRect().width * block.bounds.width),
-            ) / 100,
-          );
+      const availableWidth = this.host.clientWidth - 32;
+      const blockWidthAtScaleOne =
+        page.getViewport({ scale: 1 }).width * (96 / 72) * block.bounds.width;
+      const fitScale =
+        Math.floor((availableWidth / blockWidthAtScaleOne) * 100) / 100;
+      const maxScale = layout === "source" ? 1.5 : 2;
+      const scale = Math.min(maxScale, Math.max(0.1, fitScale));
       const initialScale = this.viewer.currentScale;
       const initial = node.getBoundingClientRect(),
         view = this.host.getBoundingClientRect();
