@@ -357,6 +357,8 @@ export interface ReaderLayout {
   /** Source width in parallel mode, independent of its left/right position. */
   sourceWidth: number;
   swapped: boolean;
+  /** Parallel mode stacks source and translation top and bottom. */
+  stacked: boolean;
 }
 export interface ReaderTheme {
   /** Ordered open documents and the selected document; null selects the library. */

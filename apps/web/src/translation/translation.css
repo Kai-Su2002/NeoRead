@@ -44,11 +44,24 @@
 .translation-divider[hidden] {
   display: none;
 }
-.translation-swap {
+.translation-divider[aria-orientation="horizontal"] {
+  cursor: row-resize;
+}
+.translation-pane-controls {
   position: absolute;
   top: 12px;
   z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   transform: translateX(-50%);
+}
+.translation-panes[data-stacked] .translation-pane-controls {
+  left: 12px;
+  flex-direction: row;
+  transform: translateY(-50%);
+}
+.translation-pane-controls > button {
   cursor: pointer;
   color: var(--muted-foreground);
 }

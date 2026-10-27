@@ -94,8 +94,14 @@ beforeEach(async () => {
   );
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
     function (this: HTMLElement) {
-      if (this.classList.contains("translation-swap"))
-        return new DOMRect(parseFloat(this.style.left) * 10 - 12, 12, 24, 24);
+      const controls = this.closest<HTMLElement>(".translation-pane-controls");
+      if (controls)
+        return new DOMRect(
+          parseFloat(controls.style.left) * 10 - 12,
+          12,
+          24,
+          24,
+        );
       return new DOMRect(
         this.hasAttribute("data-group") ? 0 : left(this),
         0,
@@ -201,7 +207,7 @@ it("supports keyboard resizing and keeps clicks on the swap button out of the dr
   const button = host.querySelector<HTMLButtonElement>(
     '[aria-label="交换原文和译文"]',
   )!;
-  const x = parseFloat(button.style.left) * 10;
+  const x = parseFloat(button.parentElement!.style.left) * 10;
   await act(async () => {
     button.dispatchEvent(
       new MouseEvent("pointerdown", {
@@ -255,4 +261,39 @@ it("restores the last source width and order after leaving a document, without s
       .querySelector("[data-group]")!
       .lastElementChild!.querySelector("[data-source]"),
   ).not.toBeNull();
+});
+
+it("stacks source and translation top and bottom without remounting the source", async () => {
+  await click("parallel");
+  expect(mount).toHaveBeenCalledTimes(1);
+  const divider = () => host.querySelector<HTMLElement>('[role="separator"]')!;
+  expect(divider().getAttribute("aria-orientation")).toBe("vertical");
+  await click("上下排列");
+  expect(
+    readerLayout(useReaderStore.getState().theme.readerLayout).stacked,
+  ).toBe(true);
+  expect(
+    host.querySelector(".translation-panes")!.hasAttribute("data-stacked"),
+  ).toBe(true);
+  expect(divider().getAttribute("aria-orientation")).toBe("horizontal");
+  expect(divider().getAttribute("aria-label")).toBe("调整原文和译文高度");
+  const controls = host.querySelector<HTMLElement>(
+    ".translation-pane-controls",
+  )!;
+  expect(controls.style.top).not.toBe("");
+  expect(controls.style.left).toBe("");
+  await click("交换原文和译文");
+  await click("左右排列");
+  expect(
+    readerLayout(useReaderStore.getState().theme.readerLayout),
+  ).toMatchObject({ stacked: false, swapped: true });
+  expect(divider().getAttribute("aria-orientation")).toBe("vertical");
+  expect(mount).toHaveBeenCalledTimes(1);
+  expect(unmount).not.toHaveBeenCalled();
+});
+
+it("hides the layout controls outside parallel mode", async () => {
+  expect(host.querySelector('[aria-label="上下排列"]')).toBeNull();
+  await click("translation");
+  expect(host.querySelector('[aria-label="上下排列"]')).toBeNull();
 });
