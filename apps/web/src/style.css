@@ -215,6 +215,9 @@
 svg:is(.lucide-trash, .lucide-trash-2) {
   color: var(--destructive);
 }
+:is(button, [role="menuitem"]):has(> svg:is(.lucide-trash, .lucide-trash-2)) {
+  color: var(--destructive) !important;
+}
 kbd {
   font-size: 10px;
   font-family: inherit;
