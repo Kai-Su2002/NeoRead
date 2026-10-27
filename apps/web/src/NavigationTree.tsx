@@ -66,6 +66,7 @@ export function NavigationTree({
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [allCollapsed, setAllCollapsed] = useState(false);
   const lock = useRef(false);
   const alive = useRef(true);
   const [orders, setOrders] = useState<Record<string, number[]>>({});
@@ -154,10 +155,12 @@ export function NavigationTree({
         : flat.find(sameSection)?.id;
   const disabled = !loaded || saving || resolving;
   const branches = flat.filter((item) => item.children.length > 0);
-  function setAllCollapsed(collapsed: boolean) {
+  function toggleAllCollapsed() {
+    const collapsed = !allCollapsed;
     const entries = { ...state.entries };
     for (const item of branches)
       entries[item.id] = { ...entries[item.id], collapsed };
+    setAllCollapsed(collapsed);
     void save({ ...state, entries });
   }
   async function change(id: string, patch: NavigationEdit) {
@@ -496,22 +499,16 @@ export function NavigationTree({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="全部折叠"
-            title="全部折叠"
-            disabled={disabled || !branches.some((item) => !item.collapsed)}
-            onClick={() => setAllCollapsed(true)}
+            aria-label={allCollapsed ? "全部展开" : "全部折叠"}
+            title={allCollapsed ? "全部展开" : "全部折叠"}
+            disabled={disabled || branches.length === 0}
+            onClick={toggleAllCollapsed}
           >
-            <ChevronsDownUp className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="全部展开"
-            title="全部展开"
-            disabled={disabled || !branches.some((item) => item.collapsed)}
-            onClick={() => setAllCollapsed(false)}
-          >
-            <ChevronsUpDown className="size-4" />
+            {allCollapsed ? (
+              <ChevronsUpDown className="size-4" />
+            ) : (
+              <ChevronsDownUp className="size-4" />
+            )}
           </Button>
         </div>
       )}

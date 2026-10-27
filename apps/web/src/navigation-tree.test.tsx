@@ -279,7 +279,7 @@ it("selects collapsed descendants with select all and can deselect all", async (
   ).toBe(true);
 });
 
-it("collapses and expands all nested branches in one save without navigating", async () => {
+it("toggles all nested branches with one button, one save per click, without navigating", async () => {
   const nested: TOCItem[] = [
     {
       ...outline[0],
@@ -330,5 +330,7 @@ it("collapses and expands all nested branches in one save without navigating", a
     a: { collapsed: false },
     b: { label: "Renamed", collapsed: false },
   });
+  expect(host.querySelector('[aria-label="全部折叠"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="全部展开"]')).toBeNull();
   expect(go).not.toHaveBeenCalled();
 });
