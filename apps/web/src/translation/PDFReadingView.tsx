@@ -139,6 +139,9 @@ export function PDFReadingView({
     if (!active) return;
     const host = pane.current;
     if (!host) return;
+    // Measure the panel, not the pane: the pane's own half-height padding
+    // would keep it from shrinking when the panel gets shorter.
+    const frame = host.parentElement ?? host;
     let initialized = false;
     const resize = () => {
       const node = Array.from(
@@ -149,7 +152,7 @@ export function PDFReadingView({
       const before = node?.getBoundingClientRect().top;
       host.style.setProperty(
         "--translation-inset",
-        `${host.clientHeight / 2}px`,
+        `${frame.clientHeight / 2}px`,
       );
       if (initialized && node && before !== undefined)
         host.scrollTop += node.getBoundingClientRect().top - before;
@@ -157,7 +160,7 @@ export function PDFReadingView({
     };
     resize();
     const observer = new ResizeObserver(resize);
-    observer.observe(host);
+    observer.observe(frame);
     return () => {
       observer.disconnect();
       cancelTranslationMotion();
