@@ -76,6 +76,9 @@ func (s *Server) applyFound(id string, found PaperMetadata, title, source, looku
 			return d, err
 		}
 		if n, _ := result.RowsAffected(); n == 1 {
+			if nextTitle != d.Title || string(after) != string(before) {
+				s.connectorRevision.Add(1)
+			}
 			return s.Store.Document(id)
 		}
 	}
@@ -280,9 +283,8 @@ func (s *Server) metadataWorker(ctx context.Context) {
 			continue
 		}
 		var id string
-		err := s.Store.DB.QueryRow(`SELECT d.id FROM documents d LEFT JOIN document_processing p ON p.document_id=d.id
+		err := s.Store.DB.QueryRow(`SELECT d.id FROM documents d
    WHERE d.library='papers' AND d.deleted_at='' AND json_extract(d.metadata,'$.lookup')='pending'
-   AND (p.document_id IS NULL OR p.phase!='learning' OR p.status='failed')
    ORDER BY d.created_at LIMIT 1`).Scan(&id)
 		if errors.Is(err, sql.ErrNoRows) || err != nil {
 			continue
@@ -292,7 +294,7 @@ func (s *Server) metadataWorker(ctx context.Context) {
 			continue
 		}
 		lookupCtx, cancel := context.WithTimeout(work, time.Minute)
-		_, err = s.lookupDocument(lookupCtx, id, false)
+		_, err = s.autoPaperLookup(lookupCtx, id)
 		cancel()
 		finish()
 		if ctx.Err() != nil || work.Err() != nil {
