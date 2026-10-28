@@ -44,3 +44,9 @@ documents to verify that switching documents/cursors cannot redirect updates,
 preferences, insertion or removal, and that closing the original document
 rejects subsequent writes. It closes only its own Word instance. The test
 module and wrappers are not included in the shipped template.
+
+On macOS, run `osascript apps/cite-plugins/word/test-field-result.applescript`
+with Word installed. This creates and closes only its own unsaved document to
+check the print-date-to-ADDIN field creation workaround, result replacement,
+hidden field codes, and absence of leaked placeholder text. It exercises the
+Word object model; use the rebuilt template for end-to-end VBA acceptance.

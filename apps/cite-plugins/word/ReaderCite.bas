@@ -223,8 +223,16 @@ Private Function InsertField(lines() As String) As String
         Set target = note.Range
     End If
     Dim f As Field
+#If Mac Then
+    ' An empty field on Mac has no writable result; text lands outside it.
+    Set f = mDocument.Fields.Add(Range:=target, Type:=wdFieldPrintDate, _
+        PreserveFormatting:=False)
+    f.Code.Text = " ADDIN READER_TEMP "
+#Else
     Set f = mDocument.Fields.Add(Range:=target, Type:=wdFieldEmpty, _
         Text:="ADDIN READER_TEMP", PreserveFormatting:=False)
+#End If
+    f.ShowCodes = False
     If kind = "bibliography" Then
         f.Result.Text = "{Bibliography}"
     Else
@@ -275,6 +283,7 @@ Private Sub UpdateFields(lines() As String)
             count = 0
         Case "code"
             f.Code.Text = " ADDIN " & Part(lines(i), 1) & " "
+            f.ShowCodes = False
         Case "text"
             mode = "text"
         Case "bibliography"

@@ -53,6 +53,14 @@ Public Function RunIsolationTests() As String
     Check a.Fields.Count = 2, "Citation was not inserted into A"
     Check a.Fields(2).Code.Start - 1 = savedPosition, "Insertion followed the changed cursor"
     Check b.Fields.Count = 1, "Citation was inserted into B"
+    Check a.Fields(2).Result.Text = "{Citation}", "Placeholder was written outside the field"
+    Check Not a.Fields(2).ShowCodes, "Inserted field shows its internal code"
+    ignored = Op("Document.getState")
+    ignored = Op("Document.updateFields" & vbLf & "field" & vbTab & "1" & vbLf & _
+        "code" & vbTab & "READER_CITATION result-test" & vbLf & "text" & vbLf & _
+        "run" & vbTab & vbTab & "[1]" & vbLf & "end")
+    Check a.Fields(2).Result.Text = "[1]", "Citation result was written outside the field"
+    Check InStr(a.Content.Text, "{Citation}") = 0, "Placeholder leaked into document text"
 
     ignored = Op("Document.getState")
     b.Activate
