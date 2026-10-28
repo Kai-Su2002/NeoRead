@@ -255,14 +255,14 @@ func (s *codexSession) generate(ctx context.Context, in AIInput, delta func(stri
 			in.Chat.toolMu.Lock()
 			webCalls := in.Chat.webCalls
 			in.Chat.toolMu.Unlock()
-			if !webBudgetNotified && webCalls >= webToolCalls && id != "" {
+			if !webBudgetNotified && webCalls >= webToolCalls-10 && id != "" {
 				webBudgetNotified = true
 				s.serial++
 				webBudgetNoticeID = s.serial
 				slog.InfoContext(ctx, "web.search.budget_reached", "requestId", requestID(ctx), "limit", webToolCalls)
 				if err := lifecycle.send(map[string]any{"id": webBudgetNoticeID, "method": "turn/steer", "params": map[string]any{
 					"threadId": threadID, "expectedTurnId": id,
-					"input": []any{map[string]string{"type": "text", "text": "本轮网页搜索和读取已达到 200 次上限。请停止使用联网工具，依据已有资料完成回答，并说明未能核实的内容。"}},
+					"input": []any{map[string]string{"type": "text", "text": "本轮网页搜索和读取已接近预算，请优先补充必要证据并尽快完成回答，说明尚未核实的内容。"}},
 				}}); err != nil {
 					slog.WarnContext(ctx, "web.search.budget_notice_failed", "requestId", requestID(ctx))
 				}

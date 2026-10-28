@@ -71,7 +71,7 @@ func runWebEventsProcess() {
 						os.Exit(5)
 					}
 					var steer codexRPCMessage
-					if json.Unmarshal(scanner.Bytes(), &steer) != nil || steer.Method != "turn/steer" || !strings.Contains(string(steer.Params), "200") || !strings.Contains(string(steer.Params), "停止") {
+					if json.Unmarshal(scanner.Bytes(), &steer) != nil || steer.Method != "turn/steer" || !strings.Contains(string(steer.Params), "预算") || !strings.Contains(string(steer.Params), "尽快") {
 						os.Exit(6)
 					}
 					encoder.Encode(map[string]any{"id": steer.ID, "result": map[string]any{}})
@@ -98,7 +98,7 @@ func TestCodexWebBudgetSteersAndCompletes(t *testing.T) {
 	}
 	defer session.close()
 	session.finalMessagesOnly = true
-	chat := &chatInput{WebSearch: true, webCalls: webToolCalls - 1}
+	chat := &chatInput{WebSearch: true, webCalls: webToolCalls - 11}
 	text, err := session.generate(t.Context(), AIInput{Prompt: "question", Chat: chat}, nil)
 	if err != nil || !strings.Contains(text, "Official docs") {
 		t.Fatal("budget notice should allow final answer", err, text)

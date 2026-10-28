@@ -157,13 +157,12 @@ export async function runAgent(
       event.message.role === "assistant" &&
       event.message.content.some((part) => part.type === "toolCall")
     ) {
-      session.setActiveToolsByName([]);
       session.agent.steer({
         role: "user",
         content: [
           {
             type: "text",
-            text: "本轮工具调用轮次已达到上限。请停止使用工具，依据已有资料完成回答，并说明尚未核实的内容。",
+            text: "本轮工具调用已接近预算，请关注剩余时间和上下文，优先补充必要证据并尽快完成回答。",
           },
         ],
         timestamp: Date.now(),
