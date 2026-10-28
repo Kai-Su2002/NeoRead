@@ -48,6 +48,7 @@ import { startDiagnosticService } from "./diagnostic-service";
 import { serverSpawnDiagnostics } from "./server-spawn-diagnostics";
 import { discoverEndNote } from "./endnote-discovery";
 import { commandLineStatus, setCommandLine } from "./command-line";
+import { createCitationWindow } from "./citation-window";
 import {
   citePluginStatus,
   installCitePlugin,
@@ -801,6 +802,16 @@ app
       home: homedir(),
       appData: app.getPath("appData"),
       plugins: citePluginsDirectory(),
+      requestFolderAccess: async (folder: string) => {
+        const selected = await dialog.showOpenDialog(window!, {
+          title: "允许访问 Word 插件文件夹",
+          message: "请选择当前文件夹，允许 NeoRead 安装或移除 Word 引用插件。",
+          buttonLabel: "允许访问",
+          defaultPath: folder,
+          properties: ["openDirectory"],
+        });
+        return selected.canceled ? null : selected.filePaths[0] || null;
+      },
     });
     const citeKind = (kind: unknown): CitePluginKind => {
       if (kind !== "word" && kind !== "wps") throw new Error("Invalid plugin");
@@ -819,7 +830,35 @@ app
     });
     ipcMain.handle("neoread:cite-plugin-install", async (event, kind) => {
       fromWindow(event);
-      await installCitePlugin(citeKind(kind), citeOptions());
+      const plugin = citeKind(kind);
+      const started = Date.now();
+      diagnostics?.logs.record("desktop", {
+        level: "info",
+        event: "cite_plugin.install_start",
+        kind: plugin,
+      });
+      try {
+        await installCitePlugin(plugin, citeOptions());
+        diagnostics?.logs.record("desktop", {
+          level: "info",
+          event: "cite_plugin.install_finish",
+          kind: plugin,
+          durationMs: Date.now() - started,
+        });
+      } catch (error) {
+        const cause = (error as Error).cause || error;
+        const code = (cause as NodeJS.ErrnoException).code;
+        diagnostics?.logs.record("desktop", {
+          level: "error",
+          event: "cite_plugin.install_failed",
+          kind: plugin,
+          durationMs: Date.now() - started,
+          errorCode: ["EPERM", "EACCES", "EBUSY", "ENOENT"].includes(code || "")
+            ? code
+            : "install",
+        });
+        throw error;
+      }
       return citePluginStatus(citeOptions());
     });
     ipcMain.handle("neoread:cite-plugin-uninstall", async (event, kind) => {
@@ -975,6 +1014,12 @@ app
     await window.loadURL(
       `${url}/${recoveryServer ? "?libraryRecovery=1" : ""}#token=${serverToken}`,
     );
+    if (!recoveryServer)
+      await createCitationWindow({
+        url,
+        token: serverToken,
+        preload: join(__dirname, "preload.cjs"),
+      });
     if (migration && !recoveryServer)
       await promptLegacyCleanup(
         window,

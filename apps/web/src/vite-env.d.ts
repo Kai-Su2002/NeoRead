@@ -62,6 +62,9 @@ interface Window {
     openExternal: (url: string) => Promise<void>;
     openCodexThread?: (threadId: string) => Promise<void>;
     focusWindow?: () => Promise<void>;
+    setCitationVisible?: (visible: boolean) => Promise<void>;
+    setCitationSize?: (width: number, height: number) => Promise<void>;
+    onCitationClose?: (callback: () => void) => () => void;
     citePlugins?: () => Promise<import("./cite/plugins").CitePluginStatus[]>;
     installCitePlugin?: (
       kind: "word" | "wps",

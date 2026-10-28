@@ -218,6 +218,29 @@ svg:is(.lucide-trash, .lucide-trash-2) {
 :is(button, [role="menuitem"]):has(> svg:is(.lucide-trash, .lucide-trash-2)) {
   color: var(--destructive) !important;
 }
+/* The citation window is transparent and sized to its dialog. */
+html[data-citation-window],
+html[data-citation-window] body {
+  background: transparent;
+}
+html[data-citation-window]
+  :is([data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"]) {
+  display: none;
+}
+html[data-citation-window]
+  :is([data-slot="dialog-content"], [data-slot="alert-dialog-content"]) {
+  max-width: calc(100% - 2rem);
+}
+/* Without a title bar, the dialog header moves the window. */
+html[data-citation-window]
+  :is([data-slot="dialog-header"], [data-slot="alert-dialog-header"]) {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+html[data-citation-window] :is(button, input, select, textarea, a) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
 kbd {
   font-size: 10px;
   font-family: inherit;
