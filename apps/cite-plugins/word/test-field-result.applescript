@@ -6,10 +6,10 @@ tell application "Microsoft Word"
 		set target to create range testDocument start 0 end 0
 		create new field text range target field type field print date preserve formatting false
 		set citationField to first field of text object of testDocument
-		set content of field code of citationField to " ADDIN READER_TEMP "
+		set content of field code of citationField to " ADDIN NEOREAD_TEMP "
 		set show codes of citationField to false
 		set content of result range of citationField to "{Citation}"
-		set content of field code of citationField to " ADDIN READER_CITATION TEST "
+		set content of field code of citationField to " ADDIN NEOREAD_CITATION TEST "
 		set show codes of citationField to false
 		set content of result range of citationField to "[1]"
 		if content of result range of citationField is not "[1]" then error "Citation result is outside the field"

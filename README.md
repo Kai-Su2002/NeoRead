@@ -130,7 +130,7 @@ CLI 在临时空目录中运行。Claude 配置为禁用工具与 MCP；Codex �
 
 书库保存路径（包括上级目录）不能包含 `?`。自定义位置记录在 `userData/library-location.json`，命令行也会跟随该位置。若外接存储设备未连接或保存位置已被移走，桌面版会停止启动并提示错误，不会自动创建空书库。上表是未自定义时的默认目录。
 
-旧 Reader 的书库通常在 `~/Library/Application Support/Reader/library/`。更名涉及的数据迁移方案见[迁移设计](docs/neoread-migration.md)，尚待实现和升级验收。
+旧 Reader 的书库通常在 `~/Library/Application Support/Reader/library/`。安装版 NeoRead 首次启动时会一次性复制并校验旧书库及相关配置，迁移完成后可选择清理已迁移的旧业务数据；开发模式不读取旧 Reader 数据。迁移范围、恢复与清理规则见[迁移说明](docs/neoread-migration.md)。
 
 ```text
 library/

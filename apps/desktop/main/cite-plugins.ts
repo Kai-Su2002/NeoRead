@@ -18,16 +18,16 @@ import { promisify } from "node:util";
 /**
  * Installs the Word template and the WPS add-in for the citation plugin.
  * Word loads every template in its startup folder; WPS loads the add-in from
- * Reader's connector port, registered in its jsaddons XML files.
+ * NeoRead's connector port, registered in its jsaddons XML files.
  */
 export type CitePluginKind = "word" | "wps";
 export type CitePluginStatus = {
   kind: CitePluginKind;
-  /** False on platforms Reader cannot install this plugin on yet. */
+  /** False on platforms NeoRead cannot install this plugin on yet. */
   supported: boolean;
   /** The word processor appears to be installed. */
   detected: boolean;
-  /** The plugin files ship with this Reader build. */
+  /** The plugin files ship with this NeoRead build. */
   available: boolean;
   installed: boolean;
 };
@@ -44,7 +44,7 @@ export type CitePluginOptions = {
   windowsWordFolders?: () => Promise<{ folders: string[]; detected: boolean }>;
 };
 
-const WPS_NAME = "reader-cite";
+const WPS_NAME = "neoread-cite";
 const WPS_URL = "http://127.0.0.1:17841/wps/";
 const WPS_VERSION = "1.0.0";
 
@@ -61,11 +61,11 @@ function wordPaths({ platform, home, appData }: CitePluginOptions) {
       office,
       template: join(
         office,
-        "User Content.localized/Startup.localized/Word/Reader.dotm",
+        "User Content.localized/Startup.localized/Word/NeoRead.dotm",
       ),
       script: join(
         home,
-        "Library/Application Scripts/com.microsoft.Word/ReaderCite.scpt",
+        "Library/Application Scripts/com.microsoft.Word/NeoReadCite.scpt",
       ),
     };
   }
@@ -73,7 +73,7 @@ function wordPaths({ platform, home, appData }: CitePluginOptions) {
     const office = join(appData, "Microsoft", "Word");
     return {
       office,
-      template: join(office, "STARTUP", "Reader.dotm"),
+      template: join(office, "STARTUP", "NeoRead.dotm"),
       script: "",
     };
   }
@@ -181,7 +181,7 @@ async function wordLocations(options: CitePluginOptions) {
       ...new Map(
         folders.map((folder) => [
           folder.toLowerCase(),
-          join(folder, "Reader.dotm"),
+          join(folder, "NeoRead.dotm"),
         ]),
       ).values(),
     ],
@@ -200,9 +200,10 @@ function wpsFolder({ platform, home, appData }: CitePluginOptions) {
   return null;
 }
 
-const wpsEntry = /\s*<jsplugin\b[^>]*\bname="reader-cite"[^>]*\/>/g;
+const wpsEntry =
+  /\s*<jsplugin\b[^>]*\bname="(?:neoread-cite|reader-cite)"[^>]*\/>/g;
 
-/** Adds Reader's add-in to a WPS jsaddons XML file, replacing an older entry. */
+/** Adds NeoRead's add-in to a WPS jsaddons XML file, replacing an older entry. */
 export function registerWPS(
   xml: string,
   file: "jsplugins" | "publish",
@@ -242,7 +243,7 @@ export async function citePluginStatus(
       kind: "word",
       supported: !!word,
       detected: !!word && word.detected,
-      available: await exists(join(options.plugins, "word", "Reader.dotm")),
+      available: await exists(join(options.plugins, "word", "NeoRead.dotm")),
       installed:
         !!word &&
         (await Promise.all(word.templates.map(exists))).every(Boolean),
@@ -327,25 +328,28 @@ export async function installCitePlugin(
     if (!word) throw new Error("当前系统不支持 Word 插件");
     if (!word.detected)
       throw new Error("未检测到 Microsoft Word，请先安装并打开一次 Word");
-    const template = join(options.plugins, "word", "Reader.dotm");
+    const template = join(options.plugins, "word", "NeoRead.dotm");
     if (!(await exists(template)))
-      throw new Error("这个 Reader 版本没有附带 Word 模板");
+      throw new Error("这个 NeoRead 版本没有附带 Word 模板");
     // Compile outside Word's protected directory so permission failures come
     // from filesystem operations, rather than an opaque osacompile exit code.
     const temporary = word.script
       ? await mkdtemp(join(tmpdir(), "neoread-word-"))
       : undefined;
     try {
-      const script = temporary && join(temporary, "ReaderCite.scpt");
+      const script = temporary && join(temporary, "NeoReadCite.scpt");
       if (script)
         await (options.compileAppleScript || osacompile)(
-          join(options.plugins, "word", "ReaderCite.applescript"),
+          join(options.plugins, "word", "NeoReadCite.applescript"),
           script,
         );
       if (script && word.script)
         await wordFileOperation(word.script, options, async () => {
           await mkdir(dirname(word.script), { recursive: true });
           await copyFile(script, word.script);
+          await rm(join(dirname(word.script), "ReaderCite.scpt"), {
+            force: true,
+          });
         });
       for (const target of word.templates) {
         if (
@@ -358,6 +362,8 @@ export async function installCitePlugin(
         await wordFileOperation(target, options, async () => {
           await mkdir(dirname(target), { recursive: true });
           await copyFile(template, target);
+          // Remove the former template only after its replacement is installed.
+          await rm(join(dirname(target), "Reader.dotm"), { force: true });
         });
       }
     } finally {
@@ -367,14 +373,18 @@ export async function installCitePlugin(
   }
   const folder = wpsFolder(options);
   if (!folder) throw new Error("当前系统暂不支持 WPS 插件");
-  const keyPath = join(options.appData, "Reader", "cite-wps-key");
+  const keyPath = join(options.appData, "NeoRead", "cite-wps-key");
   await mkdir(dirname(keyPath), { recursive: true, mode: 0o700 });
   // WPS appends ribbon.xml/index.html; protect the installation base path.
-  let key = await readFile(keyPath, "utf8").catch(() => "");
+  let key = await readFile(keyPath, "utf8").catch(() =>
+    readFile(join(options.appData, "Reader", "cite-wps-key"), "utf8").catch(
+      () => "",
+    ),
+  );
   if (!/^[a-f0-9]{64}$/.test(key)) {
     key = randomBytes(32).toString("hex");
-    await writeFile(keyPath, key, { mode: 0o600 });
   }
+  await writeFile(keyPath, key, { mode: 0o600 });
   await chmod(keyPath, 0o600);
   await mkdir(folder, { recursive: true, mode: 0o700 });
   for (const file of ["jsplugins", "publish"] as const) {
@@ -409,5 +419,5 @@ export async function uninstallCitePlugin(
     const xml = await readFile(path, "utf8").catch(() => null);
     if (xml !== null) await writeFile(path, unregisterWPS(xml));
   }
-  await rm(join(options.appData, "Reader", "cite-wps-key"), { force: true });
+  await rm(join(options.appData, "NeoRead", "cite-wps-key"), { force: true });
 }
