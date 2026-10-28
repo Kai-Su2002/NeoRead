@@ -6,6 +6,12 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("electron", () => ({
   app: { once: vi.fn(), focus: vi.fn() },
+  screen: {
+    getCursorScreenPoint: () => ({ x: 0, y: 0 }),
+    getDisplayNearestPoint: () => ({
+      workArea: { x: 0, y: 25, width: 1440, height: 875 },
+    }),
+  },
   ipcMain: {
     handle: (name: string, handler: (...args: any[]) => unknown) =>
       state.handlers.set(name, handler),
@@ -19,6 +25,11 @@ vi.mock("electron", () => ({
     hide = vi.fn();
     show = vi.fn();
     focus = vi.fn();
+    setAlwaysOnTop = vi.fn();
+    setVisibleOnAllWorkspaces = vi.fn();
+    setBounds = vi.fn();
+    isVisible = () => false;
+    getBounds = () => ({ x: 0, y: 0, width: 740, height: 740 });
     setMenu = vi.fn();
     loadURL = vi.fn(async () => {});
     constructor(options: Record<string, unknown>) {
@@ -27,6 +38,7 @@ vi.mock("electron", () => ({
     }
   },
 }));
+import { app } from "electron";
 import { createCitationWindow } from "./citation-window";
 beforeEach(() => state.handlers.clear());
 it("starts hidden, limits visibility IPC to its own main frame and cancels on close", async () => {
@@ -34,9 +46,8 @@ it("starts hidden, limits visibility IPC to its own main frame and cancels on cl
     url: "http://127.0.0.1:1234",
     token: "test",
     preload: "/preload.cjs",
-    backgroundColor: "#fff",
   });
-  expect(state.options.show).toBe(false);
+  expect(state.options).toMatchObject({ show: false, frame: false });
   expect(window.loadURL).toHaveBeenCalledWith(
     "http://127.0.0.1:1234/?citationWindow=1#token=test",
   );
@@ -48,8 +59,19 @@ it("starts hidden, limits visibility IPC to its own main frame and cancels on cl
     sender: window.webContents,
     senderFrame: window.webContents.mainFrame,
   };
+  const size = state.handlers.get("neoread:citation-size")!;
+  expect(() => size(event, "wide", 10)).toThrow("Invalid size");
+  size(event, 480, 400.4);
+  expect(window.setBounds).toHaveBeenCalledWith({
+    x: 480,
+    y: 262,
+    width: 480,
+    height: 401,
+  });
   visible(event, true);
   expect(window.show).toHaveBeenCalledOnce();
+  // Showing must not activate NeoRead and bring the library forward.
+  expect(app.focus).not.toHaveBeenCalled();
   const preventDefault = vi.fn();
   window.emit("close", { preventDefault });
   expect(preventDefault).toHaveBeenCalledOnce();

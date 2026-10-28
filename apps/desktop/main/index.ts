@@ -1019,7 +1019,6 @@ app
         url,
         token: serverToken,
         preload: join(__dirname, "preload.cjs"),
-        backgroundColor: windowBackground(appearance, preferences),
       });
     if (migration && !recoveryServer)
       await promptLegacyCleanup(

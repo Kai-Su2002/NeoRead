@@ -47,6 +47,50 @@ const commands: CiteCommand[] = [
   "removeCodes",
 ];
 
+/** Dialog widths in the standalone window, matching their usual max widths. */
+const dialogWidths: Record<Request["kind"], number> = {
+  citation: 672,
+  prefs: 448,
+  confirm: 384,
+  alert: 384,
+};
+// Transparent margin around the dialog, as in `max-w-[calc(100%-2rem)]`.
+const margin = 32;
+
+/** Sizes the standalone window to the open dialog, then shows it. */
+function fitCitationWindow(width: number) {
+  const desktop = window.neoreadDesktop;
+  let frame = 0;
+  let observer: ResizeObserver | undefined;
+  let shown = false;
+  const attach = () => {
+    const popup = document.querySelector<HTMLElement>(
+      ':is([data-slot="dialog-content"], [data-slot="alert-dialog-content"])[data-open]',
+    );
+    if (!popup) {
+      frame = requestAnimationFrame(attach);
+      return;
+    }
+    observer = new ResizeObserver(() => {
+      void desktop
+        ?.setCitationSize?.(width + margin, popup.offsetHeight + margin)
+        .then(() => {
+          // Show only once the dialog has its final width.
+          if (shown || popup.offsetWidth !== width) return;
+          shown = true;
+          return desktop.setCitationVisible?.(true);
+        })
+        .catch(() => {});
+    });
+    observer.observe(popup);
+  };
+  attach();
+  return () => {
+    cancelAnimationFrame(frame);
+    observer?.disconnect();
+  };
+}
+
 const focusWindow = () => void window.neoreadDesktop?.focusWindow?.();
 
 /**
@@ -65,6 +109,7 @@ export function CiteHost({ standalone = false }: { standalone?: boolean }) {
         transaction: string;
         cancel: () => void;
         dismiss: () => void;
+        asking: () => boolean;
       } | null;
     } = { current: null };
 
@@ -73,6 +118,7 @@ export function CiteHost({ standalone = false }: { standalone?: boolean }) {
           active.current?.dismiss(),
         )
       : undefined;
+    // The standalone window shows itself once the dialog is measured.
     const show = () =>
       standalone
         ? void window.neoreadDesktop?.setCitationVisible?.(true)
@@ -87,6 +133,7 @@ export function CiteHost({ standalone = false }: { standalone?: boolean }) {
       active.current = {
         transaction,
         dismiss: () => pending?.(),
+        asking: () => pending !== null,
         cancel: () => {
           cancelled = true;
           pending?.();
@@ -100,7 +147,7 @@ export function CiteHost({ standalone = false }: { standalone?: boolean }) {
       ) =>
         new Promise<T>((resolve) => {
           if (cancelled) return resolve(cancelValue);
-          show();
+          if (!standalone) show();
           pending = () => {
             pending = null;
             setRequest(null);
@@ -177,8 +224,9 @@ export function CiteHost({ standalone = false }: { standalone?: boolean }) {
     };
 
     const onEvent = (event: CiteEvent) => {
-      if (event.type === "focus") show();
-      else if (event.type === "aborted") {
+      if (event.type === "focus") {
+        if (!standalone || active.current?.asking()) show();
+      } else if (event.type === "aborted") {
         if (active.current?.transaction === event.transaction) {
           active.current.cancel();
           toast.info("文字处理软件已断开，本次操作已取消");
@@ -203,6 +251,11 @@ export function CiteHost({ standalone = false }: { standalone?: boolean }) {
       active.current?.cancel();
     };
   }, [standalone]);
+
+  useEffect(() => {
+    if (!standalone || !request) return;
+    return fitCitationWindow(dialogWidths[request.kind]);
+  }, [standalone, request]);
 
   if (!request) return null;
   if (request.kind === "citation")

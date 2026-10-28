@@ -89,6 +89,8 @@ contextBridge.exposeInMainWorld("neoreadDesktop", {
   focusWindow: () => ipcRenderer.invoke("neoread:focus-window"),
   setCitationVisible: (visible: boolean) =>
     ipcRenderer.invoke("neoread:citation-visible", visible),
+  setCitationSize: (width: number, height: number) =>
+    ipcRenderer.invoke("neoread:citation-size", width, height),
   onCitationClose: (callback: () => void) => {
     const listener = () => callback();
     ipcRenderer.on("neoread:citation-close", listener);

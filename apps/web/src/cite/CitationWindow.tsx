@@ -13,6 +13,9 @@ export function CitationWindow() {
     root.dataset.theme = theme.mode;
   }, [theme.mode]);
   useEffect(() => {
+    document.documentElement.dataset.citationWindow = "";
+  }, []);
+  useEffect(() => {
     void api
       .settings()
       .then((settings) => useReaderStore.getState().setTheme(settings))
