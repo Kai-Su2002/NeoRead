@@ -27,6 +27,7 @@ vi.mock("@neoread/api", () => ({
       available: [],
     })),
     update: vi.fn(async () => ({})),
+    lookupMetadata: vi.fn(async () => ({})),
     documents: vi.fn(async () => []),
     trash: vi.fn(async () => []),
     trashDocument: vi.fn(),
@@ -2372,6 +2373,7 @@ it("applies or dismisses a suggested AI title", async () => {
     title: "Suggested paper title",
     metadata: { suggestedTitle: "" },
   });
+  expect(api.lookupMetadata).toHaveBeenCalledWith("a", true);
   await act(async () => {
     useReaderStore.setState({
       documents: [
@@ -2405,4 +2407,31 @@ it("applies or dismisses a suggested AI title", async () => {
     });
   });
   expect(host.querySelector(".paper-title-suggestion")).toBeNull();
+});
+
+it("does not look up the AI title if applying it fails", async () => {
+  vi.mocked(api.update).mockRejectedValueOnce(new Error("save failed"));
+  await act(async () => {
+    useReaderStore.setState({
+      documents: [
+        {
+          ...docs[0],
+          metadata: {
+            ...docs[0].metadata,
+            suggestedTitle: "Suggested paper title",
+          },
+        },
+        docs[1],
+      ],
+    });
+    usePaperUI.setState({ selectedId: "a" });
+  });
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>(
+        'button[aria-label="应用 AI 建议标题：Suggested paper title"]',
+      )!
+      .click(),
+  );
+  expect(api.lookupMetadata).not.toHaveBeenCalled();
 });

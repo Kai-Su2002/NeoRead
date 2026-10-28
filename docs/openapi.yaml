@@ -4824,6 +4824,13 @@
                     "required": true,
                     "schema": { "type": "string" },
                   },
+                  {
+                    "in": "query",
+                    "name": "by",
+                    "required": false,
+                    "schema": { "type": "string", "enum": ["title"] },
+                    "description": "Search by the current title even if identifiers are present",
+                  },
                 ],
               "responses":
                 {

@@ -231,17 +231,18 @@ export function PaperDetail({
               className="paper-title-suggestion-apply"
               aria-label={`应用 AI 建议标题：${m.suggestedTitle}`}
               title={m.suggestedTitle}
-              onClick={() =>
-                void patchPapers([
-                  [
-                    doc,
-                    {
-                      title: m.suggestedTitle,
-                      metadata: { suggestedTitle: "" },
-                    },
-                  ],
-                ])
-              }
+              disabled={lookingUp}
+              onClick={() => {
+                const title = m.suggestedTitle;
+                if (!title) return;
+                setLookingUp(true);
+                void (async () => {
+                  const saved = await patchPapers([
+                    [doc, { title, metadata: { suggestedTitle: "" } }],
+                  ]);
+                  if (saved) await lookupPaper(doc, true);
+                })().finally(() => setLookingUp(false));
+              }}
             >
               <span>AI 建议：{m.suggestedTitle}</span>
             </Button>
@@ -344,9 +345,7 @@ export function PaperDetail({
         <div className="paper-fields-heading">
           <h3>论文信息</h3>
           {m.lookup === "pending" && (
-            <span className="text-xs text-muted-foreground">
-              解析后自动查找
-            </span>
+            <span className="text-xs text-muted-foreground">等待自动查找</span>
           )}
           <Button
             size="xs"

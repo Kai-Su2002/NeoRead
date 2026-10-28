@@ -4280,7 +4280,10 @@ export interface paths {
         /** Look up metadata by DOI, arXiv ID (also detected on the first pages) or a close title match; manual fields are kept */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Search by the current title even if identifiers are present */
+                    by?: "title";
+                };
                 header?: never;
                 path: {
                     id: string;

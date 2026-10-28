@@ -62,15 +62,23 @@ func (s *Server) autoPaperLookup(ctx context.Context, id string) (Document, erro
 		ids = scholar.Detect(strings.Join(quick.Pages, "\n"))
 	}
 	var lookupErr error = errNoIdentifier
+	title := fileTitle(layoutManifest{Metadata: quick.Metadata})
+	var candidates []scholar.Identifiers
 	if ids != (scholar.Identifiers{}) {
+		candidates = append(candidates, ids)
+	}
+	if title != "" {
+		candidates = append(candidates, scholar.Identifiers{Title: title})
+	}
+	if len(candidates) > 0 {
 		var found scholar.Metadata
-		found, lookupErr = s.scholarClient().Lookup(ctx, ids)
-		if lookupErr == nil && strings.TrimSpace(found.Title) != "" {
+		found, lookupErr = s.lookupScholarCandidates(ctx, id, candidates, true)
+		if lookupErr == nil {
 			return s.applyFound(id, fromScholar(found), found.Title, "lookup", "done")
 		}
 	}
-	if title := fileTitle(layoutManifest{Metadata: quick.Metadata}); title != "" {
-		return s.lookupExtractedTitle(ctx, id, title, "file")
+	if title != "" {
+		return s.applyFound(id, PaperMetadata{}, title, "file", "notFound")
 	}
 	config := s.aiConfig()
 	if !validAgent(config.Primary) || !(primaryCapable(config, taskTranslation) || capable(config, "text-api", false)) || len(quick.Pages) == 0 || strings.TrimSpace(quick.Pages[0]) == "" {
@@ -93,7 +101,7 @@ func (s *Server) autoPaperLookup(ctx context.Context, id string) (Document, erro
 		s.diagnosticEvent(slog.LevelWarn, "paper.title.ai", "documentId", id, "outcome", "failed", "reason", "invalid_response")
 		return d, lookupErr
 	}
-	title := strings.Join(strings.Fields(response.Title), " ")
+	title = strings.Join(strings.Fields(response.Title), " ")
 	if title == "" || len([]rune(title)) > 300 {
 		return d, lookupErr
 	}
@@ -102,17 +110,4 @@ func (s *Server) autoPaperLookup(ctx context.Context, id string) (Document, erro
 		s.diagnosticEvent(slog.LevelInfo, "paper.title.ai", "documentId", id, "outcome", "success")
 	}
 	return updated, err
-}
-
-// lookupExtractedTitle retains the extracted title even when no matching record is found.
-func (s *Server) lookupExtractedTitle(ctx context.Context, id, title, source string) (Document, error) {
-	d, err := s.applyFound(id, PaperMetadata{}, title, source, "notFound")
-	if err != nil {
-		return d, err
-	}
-	found, err := s.scholarClient().Lookup(ctx, scholar.Identifiers{Title: title})
-	if err != nil {
-		return d, nil
-	}
-	return s.applyFound(id, fromScholar(found), found.Title, "lookup", "done")
 }

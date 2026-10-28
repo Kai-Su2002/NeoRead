@@ -92,9 +92,9 @@ func TestExtractedTitleLooksUpPaperMetadata(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &d); err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.lookupExtractedTitle(context.Background(), d.ID, "A Reliable Paper Title", "file")
-	if err != nil || got.Metadata.Venue != "Example Journal" || got.Metadata.Lookup != "done" {
-		t.Fatalf("metadata lookup: %+v %v", got.Metadata, err)
+	found, err := s.lookupScholarCandidates(context.Background(), d.ID, []scholar.Identifiers{{Title: "A Reliable Paper Title"}}, true)
+	if err != nil || found.Venue != "Example Journal" {
+		t.Fatalf("metadata lookup: %+v %v", found, err)
 	}
 }
 
