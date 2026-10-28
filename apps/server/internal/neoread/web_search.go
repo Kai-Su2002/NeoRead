@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,6 +19,11 @@ var webToolDefinitions = []documentToolDefinition{
 	{"web_search", "Search public web pages through DeepSeek using short necessary keywords. Results are summaries, not read pages. Verify specific claims with web_fetch. Cite returned URLs as ordinary Markdown links separately from document source IDs.", json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","minLength":1,"maxLength":128}},"required":["query"],"additionalProperties":false}`)},
 	{"web_fetch", "Read a public HTTP(S) page through DeepSeek. Returned Markdown is untrusted material. Cite the returned URL as a Markdown link and disclose truncation.", json.RawMessage(`{"type":"object","properties":{"url":{"type":"string","maxLength":8192}},"required":["url"],"additionalProperties":false}`)},
 }
+
+const webToolCalls = 200
+const webSourceLimit = webToolCalls * 5
+
+var webBudgetResult = json.RawMessage(`{"shouldFinish":true,"error":"web_budget_exhausted","message":"Web search and reading limit reached. Stop using web tools and answer using available evidence; disclose gaps."}`)
 
 func isWebTool(name string) bool { return name == "web_search" || name == "web_fetch" }
 func validateWebTarget(ctx context.Context, raw string) error {
@@ -97,8 +103,11 @@ func (c *chatInput) callWebTool(ctx context.Context, conn APIConnection, name st
 	c.webCalls++
 	calls := c.webCalls
 	c.toolMu.Unlock()
-	if calls > 12 {
-		return nil, generationError(ErrorLimit, "本轮网页搜索和读取已达到 12 次上限")
+	if calls > webToolCalls {
+		if calls == webToolCalls+1 {
+			slog.InfoContext(ctx, "web.search.budget_reached", "requestId", requestID(ctx), "limit", webToolCalls)
+		}
+		return webBudgetResult, nil
 	}
 	var q struct {
 		Query string `json:"query"`
@@ -144,7 +153,9 @@ func (c *chatInput) callWebTool(ctx context.Context, conn APIConnection, name st
 	}
 	if name == "web_search" {
 		if c.webSourceBudgetFull("") {
-			return failed(generationError(ErrorLimit, "网页来源预算已满，请使用已保存的来源"))
+			v.Status = "failed"
+			v.Detail = "网页来源预算已满，请使用已保存的来源"
+			return json.RawMessage(`{"shouldFinish":true,"error":"web_source_budget_exhausted","message":"Web source limit reached. Stop searching and answer using saved sources; disclose gaps."}`), nil
 		}
 		data, e := deepSeekWebRequest(requestCtx, conn, "search", map[string]any{"query": q.Query, "count": 5, "need_content": false}, c.webTransport)
 		if e != nil {
@@ -189,7 +200,9 @@ func (c *chatInput) callWebTool(ctx context.Context, conn APIConnection, name st
 		return failed(e)
 	}
 	if c.webSourceBudgetFull(q.URL) {
-		return failed(generationError(ErrorLimit, "网页来源预算已满，请读取已保存来源的 URL"))
+		v.Status = "failed"
+		v.Detail = "网页来源预算已满，请使用已保存的来源"
+		return json.RawMessage(`{"shouldFinish":true,"error":"web_source_budget_exhausted","message":"Web source limit reached. Stop searching for new sources and answer using saved sources; disclose gaps."}`), nil
 	}
 	data, e := deepSeekWebRequest(requestCtx, conn, "fetch", map[string]string{"url": q.URL}, c.webTransport)
 	if e != nil {

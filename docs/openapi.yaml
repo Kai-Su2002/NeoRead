@@ -6357,7 +6357,7 @@
                   "webSources":
                     {
                       "type": "array",
-                      "maxItems": 24,
+                      "maxItems": 1000,
                       "items": { "$ref": "#/components/schemas/WebSource" },
                     },
                 },
