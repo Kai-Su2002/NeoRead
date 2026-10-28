@@ -94,6 +94,16 @@ const fieldLabels: Partial<Record<PaperMetadataField, string>> = {
   remark: "备注",
   abstract: "摘要",
 };
+const optionalFields: PaperMetadataField[] = [
+  "venue",
+  "volume",
+  "issue",
+  "pages",
+  "publisher",
+  "affiliation",
+  "shortTitle",
+];
+
 const placeholders: Partial<Record<PaperMetadataField, string>> = {
   date: "2024 或 2024-05-17",
   doi: "10.xxxx/… 或 doi.org 链接",
@@ -163,6 +173,9 @@ export function PaperDetail({
   const [abstractOpen, setAbstractOpen] = useState(false);
   const [editingAbstract, setEditingAbstract] = useState(false);
   const [lookingUp, setLookingUp] = useState(false);
+  const [expandedFieldsFor, setExpandedFieldsFor] = useState<string | null>(
+    null,
+  );
   const [snapshotAvailable, setSnapshotAvailable] = useState(false);
   const [snapshotOpen, setSnapshotOpen] = useState(false);
   useEffect(() => {
@@ -180,6 +193,10 @@ export function PaperDetail({
     };
   }, [doc.id]);
   const m = doc.metadata;
+  const fieldsExpanded = expandedFieldsFor === doc.id;
+  const hasEmptyOptionalFields = optionalFields.some(
+    (name) => !String(m[name] ?? "").trim(),
+  );
   const link = paperLink(m);
   const percent = Math.round(doc.percentage * 100);
   const pinKey = `doc:${doc.id}`;
@@ -407,19 +424,28 @@ export function PaperDetail({
               </Button>
             )}
           </dd>
-          {(
-            [
-              "venue",
-              "volume",
-              "issue",
-              "pages",
-              "publisher",
-              "affiliation",
-            ] as PaperMetadataField[]
-          ).map((name) => (
-            <FieldRow key={name} doc={doc} name={name} />
-          ))}
-          <FieldRow doc={doc} name="shortTitle" />
+          {optionalFields
+            .filter((name) => fieldsExpanded || String(m[name] ?? "").trim())
+            .map((name) => (
+              <FieldRow key={name} doc={doc} name={name} />
+            ))}
+          {(hasEmptyOptionalFields || fieldsExpanded) && (
+            <>
+              <dt />
+              <dd>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  aria-expanded={fieldsExpanded}
+                  onClick={() =>
+                    setExpandedFieldsFor(fieldsExpanded ? null : doc.id)
+                  }
+                >
+                  {fieldsExpanded ? "收起空字段" : "展开空字段"}
+                </Button>
+              </dd>
+            </>
+          )}
           <dt>添加于</dt>
           <dd className="paper-field-static">
             {relativeTime(doc.createdAt)}
