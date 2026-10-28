@@ -209,7 +209,7 @@ export function CitationEditor({
             ))
           ) : (
             <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-              {query.trim() ? "没有匹配的论文" : "论文库中还没有论文"}
+              {query.trim() ? "没有匹配的论文" : "没有其他论文啦～"}
             </p>
           )}
         </div>
