@@ -1,15 +1,30 @@
-import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   citePluginStatus,
   installCitePlugin,
+  parseWindowsWordFolders,
   registerWPS,
   uninstallCitePlugin,
   unregisterWPS,
   type CitePluginOptions,
 } from "./cite-plugins";
+
+vi.mock("node:fs/promises", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:fs/promises")>()),
+  copyFile: vi.fn(
+    (await importOriginal<typeof import("node:fs/promises")>()).copyFile,
+  ),
+}));
 
 async function setup(platform: NodeJS.Platform) {
   const root = await mkdtemp(join(tmpdir(), "reader-cite-"));
@@ -56,7 +71,52 @@ describe("WPS registration", () => {
   });
 });
 
+describe("Windows Word folders", () => {
+  it("expands variables, prefers Word settings and deduplicates registry views", () => {
+    const registry = String.raw`HKEY_CURRENT_USER\Software\Microsoft\Office\16.0\Common\General
+    Startup    REG_SZ    LegacyStartup
+HKEY_CURRENT_USER\Software\Microsoft\Office\16.0\Word\Options
+    STARTUP-PATH    REG_EXPAND_SZ    %APPDATA%\Custom Word
+HKEY_LOCAL_MACHINE\Software\Microsoft\Office\16.0\Word
+HKEY_CURRENT_USER\Software\Microsoft\Office\17.0\Word\Options
+    STARTUP-PATH    REG_SZ    C:\Users\me\AppData\Roaming\custom word`;
+    expect(
+      parseWindowsWordFolders(registry, {
+        APPDATA: String.raw`C:\Users\me\AppData\Roaming`,
+      }),
+    ).toEqual({
+      folders: [String.raw`C:\Users\me\AppData\Roaming\custom word`],
+      detected: true,
+    });
+  });
+
+  it("resolves the legacy relative Startup value", () => {
+    expect(
+      parseWindowsWordFolders(
+        String.raw`HKEY_CURRENT_USER\Software\Microsoft\Office\16.0\Common\General
+    Startup    REG_SZ    Startup`,
+        { APPDATA: String.raw`C:\Roaming` },
+      ).folders,
+    ).toEqual([String.raw`C:\Roaming\Microsoft\Word\Startup`]);
+  });
+});
+
 describe("installing", () => {
+  it("uses configured Windows folders for installation, status and removal", async () => {
+    const { options, root } = await setup("win32");
+    const folder = join(root, "custom-startup");
+    options.windowsWordFolders = async () => ({
+      detected: true,
+      folders: [folder],
+    });
+    await installCitePlugin("word", options);
+    expect(await readFile(join(folder, "Reader.dotm"), "utf8")).toBe(
+      "template",
+    );
+    expect((await citePluginStatus(options))[0].installed).toBe(true);
+    await uninstallCitePlugin("word", options);
+    expect((await citePluginStatus(options))[0].installed).toBe(false);
+  });
   it("installs the Word template and script on macOS", async () => {
     const { options } = await setup("darwin");
     await expect(installCitePlugin("word", options)).rejects.toThrow(
@@ -71,15 +131,12 @@ describe("installing", () => {
     await installCitePlugin("word", options);
     const template = join(
       options.home,
-      "Library/Group Containers/UBF8T346G9.Office/User Content/Startup/Word/Reader.dotm",
+      "Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/Word/Reader.dotm",
     );
     expect(await readFile(template, "utf8")).toBe("template");
     expect(options.compileAppleScript).toHaveBeenCalledWith(
       join(options.plugins, "word", "ReaderCite.applescript"),
-      join(
-        options.home,
-        "Library/Application Scripts/com.microsoft.Word/ReaderCite.scpt",
-      ),
+      expect.stringMatching(/neoread-word-.*[/\\]ReaderCite\.scpt$/),
     );
     const [word, wps] = await citePluginStatus(options);
     expect(word).toEqual({
@@ -92,6 +149,91 @@ describe("installing", () => {
     expect(wps.supported).toBe(false);
     await uninstallCitePlugin("word", options);
     expect((await citePluginStatus(options))[0].installed).toBe(false);
+  });
+
+  it("requests macOS folder access only after a denied write and retries", async () => {
+    const { options } = await setup("darwin");
+    await mkdir(
+      join(options.home, "Library/Group Containers/UBF8T346G9.Office"),
+      { recursive: true },
+    );
+    options.requestFolderAccess = vi.fn(async (folder) => folder);
+    vi.mocked(copyFile).mockRejectedValueOnce(
+      Object.assign(new Error("denied"), { code: "EPERM" }),
+    );
+    await installCitePlugin("word", options);
+    expect(options.requestFolderAccess).toHaveBeenCalledWith(
+      join(options.home, "Library/Application Scripts/com.microsoft.Word"),
+    );
+    expect((await citePluginStatus(options))[0].installed).toBe(true);
+    expect(
+      await readFile(
+        join(
+          options.home,
+          "Library/Application Scripts/com.microsoft.Word/ReaderCite.scpt",
+        ),
+        "utf8",
+      ),
+    ).toBe("compiled");
+  });
+
+  it("authorizes the actual localized Word startup folder", async () => {
+    const { options } = await setup("darwin");
+    await mkdir(
+      join(options.home, "Library/Group Containers/UBF8T346G9.Office"),
+      { recursive: true },
+    );
+    options.requestFolderAccess = vi.fn(async (folder) => folder);
+    const real =
+      await vi.importActual<typeof import("node:fs/promises")>(
+        "node:fs/promises",
+      );
+    vi.mocked(copyFile)
+      .mockImplementationOnce(real.copyFile)
+      .mockRejectedValueOnce(
+        Object.assign(new Error("denied"), { code: "EPERM" }),
+      );
+    await installCitePlugin("word", options);
+    expect(options.requestFolderAccess).toHaveBeenCalledWith(
+      join(
+        options.home,
+        "Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/Word",
+      ),
+    );
+  });
+
+  it.each([null, "wrong-folder"])(
+    "does not continue after cancelled or incorrect folder authorization: %s",
+    async (selected) => {
+      const { options, root } = await setup("darwin");
+      await mkdir(
+        join(options.home, "Library/Group Containers/UBF8T346G9.Office"),
+        { recursive: true },
+      );
+      const wrong = join(root, "wrong-folder");
+      await mkdir(wrong);
+      options.requestFolderAccess = vi.fn(async () =>
+        selected === null ? null : wrong,
+      );
+      vi.mocked(copyFile).mockRejectedValueOnce(
+        Object.assign(new Error("denied"), { code: "EACCES" }),
+      );
+      await expect(installCitePlugin("word", options)).rejects.toThrow(
+        selected === null ? "已取消" : "请选择指定",
+      );
+      expect((await citePluginStatus(options))[0].installed).toBe(false);
+    },
+  );
+
+  it("does not report denied Windows access as a running Word instance", async () => {
+    const { options } = await setup("win32");
+    await mkdir(join(options.appData, "Microsoft/Word"), { recursive: true });
+    vi.mocked(copyFile).mockRejectedValueOnce(
+      Object.assign(new Error("denied"), { code: "EPERM" }),
+    );
+    await expect(installCitePlugin("word", options)).rejects.toThrow(
+      "检查目录权限",
+    );
   });
 
   it("registers the WPS add-in on Windows", async () => {
