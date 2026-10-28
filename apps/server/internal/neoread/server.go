@@ -632,6 +632,9 @@ func (s *Server) updateDocument(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if v.Title != nil {
+			if title == m.SuggestedTitle {
+				m.SuggestedTitle = ""
+			}
 			if m.Sources == nil {
 				m.Sources = map[string]string{}
 			}

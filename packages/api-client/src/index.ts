@@ -606,7 +606,9 @@ export const api = {
       progress?: DocumentLocation;
       percentage?: number;
       library?: LibraryMode;
-      metadata?: Partial<Pick<PaperMetadata, PaperMetadataField>>;
+      metadata?: Partial<
+        Pick<PaperMetadata, PaperMetadataField | "suggestedTitle">
+      >;
       readingStatus?: ReadingStatus;
     },
   ) =>

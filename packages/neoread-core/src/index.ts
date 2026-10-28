@@ -101,6 +101,7 @@ export interface Creator {
 export type MetadataSource = "file" | "lookup" | "manual";
 export interface PaperMetadata {
   itemType?: PaperItemType;
+  suggestedTitle?: string;
   translatedTitle?: string;
   shortTitle?: string;
   creators?: Creator[];
@@ -130,7 +131,7 @@ export interface PaperMetadata {
 }
 export type PaperMetadataField = Exclude<
   keyof PaperMetadata,
-  "sources" | "lookup" | "lookedUpAt"
+  "sources" | "lookup" | "lookedUpAt" | "suggestedTitle"
 >;
 export type ReadingStatus = "unread" | "reading" | "done";
 export type PaperSort =

@@ -1682,6 +1682,7 @@ export interface paths {
                         metadata?: {
                             /** @enum {unknown} */
                             itemType?: "journal" | "conference" | "preprint" | "thesis" | "book" | "chapter" | "report" | "other";
+                            suggestedTitle?: string;
                             translatedTitle?: string;
                             shortTitle?: string;
                             creators?: components["schemas"]["Creator"][];
@@ -5463,6 +5464,7 @@ export interface components {
         PaperMetadata: {
             /** @enum {unknown} */
             itemType?: "journal" | "conference" | "preprint" | "thesis" | "book" | "chapter" | "report" | "other";
+            suggestedTitle?: string;
             translatedTitle?: string;
             shortTitle?: string;
             creators?: components["schemas"]["Creator"][];

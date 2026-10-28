@@ -69,9 +69,6 @@ func (s *Server) autoPaperLookup(ctx context.Context, id string) (Document, erro
 			return s.applyFound(id, fromScholar(found), found.Title, "lookup", "done")
 		}
 	}
-	if d.Metadata.Sources["title"] == "manual" {
-		return s.applyFound(id, PaperMetadata{}, "", "lookup", "notFound")
-	}
 	if title := fileTitle(layoutManifest{Metadata: quick.Metadata}); title != "" {
 		return s.lookupExtractedTitle(ctx, id, title, "file")
 	}
@@ -100,7 +97,7 @@ func (s *Server) autoPaperLookup(ctx context.Context, id string) (Document, erro
 	if title == "" || len([]rune(title)) > 300 {
 		return d, lookupErr
 	}
-	updated, err := s.lookupExtractedTitle(ctx, id, title, "ai")
+	updated, err := s.applyFound(id, PaperMetadata{}, title, "ai", "notFound")
 	if err == nil {
 		s.diagnosticEvent(slog.LevelInfo, "paper.title.ai", "documentId", id, "outcome", "success")
 	}

@@ -3186,6 +3186,33 @@ body[data-resizing] * {
   gap: 14px;
   padding: 20px 20px 28px;
 }
+.paper-title-suggestion {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: -8px;
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+.paper-title-suggestion-apply.paper-title-suggestion-apply {
+  min-width: 0;
+  height: auto;
+  padding: 5px 30px 5px 9px;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+  font-weight: 400;
+}
+.paper-title-suggestion-dismiss.paper-title-suggestion-dismiss {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 26px;
+  height: 26px;
+  color: var(--muted-foreground);
+}
 .paper-detail-open.paper-detail-open {
   height: 48px;
   margin-bottom: 4px;

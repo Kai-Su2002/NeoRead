@@ -20,6 +20,7 @@ import type {
   PaperMetadataField,
 } from "@neoread/core";
 import { Button } from "@neoread/ui/components/button";
+import { Badge } from "@neoread/ui/components/badge";
 import { api, publicationURL } from "@neoread/api";
 import {
   Dialog,
@@ -219,6 +220,43 @@ export function PaperDetail({
             }
           }}
         />
+        {m.suggestedTitle && m.suggestedTitle !== doc.title && (
+          <Badge
+            variant="secondary"
+            className="paper-title-suggestion !h-auto !overflow-visible !p-0 !whitespace-normal"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              className="paper-title-suggestion-apply"
+              aria-label={`应用 AI 建议标题：${m.suggestedTitle}`}
+              onClick={() =>
+                void patchPapers([
+                  [
+                    doc,
+                    {
+                      title: m.suggestedTitle,
+                      metadata: { suggestedTitle: "" },
+                    },
+                  ],
+                ])
+              }
+            >
+              <span>AI 建议：{m.suggestedTitle}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="paper-title-suggestion-dismiss"
+              aria-label="删除 AI 建议标题"
+              onClick={() =>
+                void patchPapers([[doc, { metadata: { suggestedTitle: "" } }]])
+              }
+            >
+              <X />
+            </Button>
+          </Badge>
+        )}
         <Button className="paper-detail-open" onClick={() => actions.open(doc)}>
           <BookOpen />
           {percent > 1 ? `继续阅读 · ${percent}%` : "开始阅读"}

@@ -56,10 +56,21 @@ func (s *Server) applyFound(id string, found PaperMetadata, title, source, looku
 		}
 		changed := m.Merge(found, source)
 		nextTitle := d.Title
-		if title = strings.TrimSpace(title); title != "" && m.Sources["title"] != "manual" && (source == "lookup" || m.Sources["title"] == "") {
+		if title = strings.TrimSpace(title); source == "ai" {
+			if t, e := cleanText(title, 300, false); e == nil {
+				if t == d.Title {
+					m.SuggestedTitle = ""
+				} else {
+					m.SuggestedTitle = t
+				}
+			}
+		} else if title != "" && m.Sources["title"] != "manual" && (source == "lookup" || m.Sources["title"] == "") {
 			if t, e := cleanText(title, 300, false); e == nil && t != "" {
 				nextTitle, m.Sources["title"] = t, source
 			}
+		}
+		if m.SuggestedTitle == nextTitle {
+			m.SuggestedTitle = ""
 		}
 		author := d.Author
 		for _, key := range changed {

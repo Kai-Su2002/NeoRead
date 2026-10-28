@@ -2340,3 +2340,69 @@ it("opens picked papers together in document tabs and exits batch mode", async (
   );
   expect(usePaperUI.getState().picking).toBe(false);
 });
+
+it("applies or dismisses a suggested AI title", async () => {
+  await act(async () => {
+    useReaderStore.setState({
+      documents: [
+        {
+          ...docs[0],
+          metadata: {
+            ...docs[0].metadata,
+            suggestedTitle: "Suggested paper title",
+          },
+        },
+        docs[1],
+      ],
+    });
+    usePaperUI.setState({ selectedId: "a" });
+  });
+  expect(
+    host.querySelector<HTMLTextAreaElement>('textarea[aria-label="标题"]')
+      ?.value,
+  ).toBe(docs[0].title);
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>(
+        'button[aria-label="应用 AI 建议标题：Suggested paper title"]',
+      )!
+      .click(),
+  );
+  expect(api.update).toHaveBeenLastCalledWith("a", {
+    title: "Suggested paper title",
+    metadata: { suggestedTitle: "" },
+  });
+  await act(async () => {
+    useReaderStore.setState({
+      documents: [
+        {
+          ...docs[0],
+          metadata: { ...docs[0].metadata, suggestedTitle: "Another title" },
+        },
+        docs[1],
+      ],
+    });
+  });
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>(
+        'button[aria-label="删除 AI 建议标题"]',
+      )!
+      .click(),
+  );
+  expect(api.update).toHaveBeenLastCalledWith("a", {
+    metadata: { suggestedTitle: "" },
+  });
+  await act(async () => {
+    useReaderStore.setState({
+      documents: [
+        {
+          ...docs[0],
+          metadata: { ...docs[0].metadata, suggestedTitle: docs[0].title },
+        },
+        docs[1],
+      ],
+    });
+  });
+  expect(host.querySelector(".paper-title-suggestion")).toBeNull();
+});

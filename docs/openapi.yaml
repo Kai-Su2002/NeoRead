@@ -1756,6 +1756,11 @@
                                                   "other",
                                                 ],
                                             },
+                                          "suggestedTitle":
+                                            {
+                                              "type": "string",
+                                              "maxLength": 300,
+                                            },
                                           "translatedTitle":
                                             { "type": "string" },
                                           "shortTitle": { "type": "string" },
@@ -7175,6 +7180,7 @@
                           "other",
                         ],
                     },
+                  "suggestedTitle": { "type": "string", "maxLength": 300 },
                   "translatedTitle": { "type": "string" },
                   "shortTitle": { "type": "string" },
                   "creators":

@@ -37,7 +37,7 @@ func TestAutoPaperTitleFallback(t *testing.T) {
 	}
 	revision := s.connectorRevision.Load()
 	got, err := s.autoPaperLookup(context.Background(), d.ID)
-	if err != nil || got.Title != "A Reliable Paper Title" || got.Metadata.Lookup != "notFound" {
+	if err != nil || got.Title != "random" || got.Metadata.SuggestedTitle != "A Reliable Paper Title" || got.Metadata.Lookup != "notFound" {
 		t.Fatalf("got title %q state %q err %v", got.Title, got.Metadata.Lookup, err)
 	}
 	if s.connectorRevision.Load() <= revision {
@@ -48,7 +48,7 @@ func TestAutoPaperTitleFallback(t *testing.T) {
 	}
 	request(t, s, "PATCH", "/api/documents/"+d.ID, strings.NewReader(`{"title":"Manual title"}`))
 	got, err = s.autoPaperLookup(context.Background(), d.ID)
-	if err != nil || got.Title != "Manual title" {
+	if err != nil || got.Title != "Manual title" || got.Metadata.SuggestedTitle != "A Reliable Paper Title" {
 		t.Fatalf("manual title overwritten: %q %v", got.Title, err)
 	}
 }
@@ -92,8 +92,42 @@ func TestExtractedTitleLooksUpPaperMetadata(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &d); err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.lookupExtractedTitle(context.Background(), d.ID, "A Reliable Paper Title", "ai")
+	got, err := s.lookupExtractedTitle(context.Background(), d.ID, "A Reliable Paper Title", "file")
 	if err != nil || got.Metadata.Venue != "Example Journal" || got.Metadata.Lookup != "done" {
 		t.Fatalf("metadata lookup: %+v %v", got.Metadata, err)
+	}
+}
+
+func TestPaperTitleSuggestionApplyDismissAndEqual(t *testing.T) {
+	s := testServer(t)
+	w := uploadTo(t, s, "papers", "random.pdf", testPDF(1))
+	var d Document
+	if err := json.Unmarshal(w.Body.Bytes(), &d); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.applyFound(d.ID, PaperMetadata{}, "random", "ai", "notFound")
+	if err != nil || got.Metadata.SuggestedTitle != "" {
+		t.Fatalf("equal title suggested: %+v %v", got, err)
+	}
+	got, err = s.applyFound(d.ID, PaperMetadata{}, "Suggested Title", "ai", "notFound")
+	if err != nil || got.Title != "random" || got.Metadata.SuggestedTitle != "Suggested Title" {
+		t.Fatalf("suggestion: %+v %v", got, err)
+	}
+	w = request(t, s, "PATCH", "/api/documents/"+d.ID, strings.NewReader(`{"metadata":{"suggestedTitle":""}}`))
+	if w.Code != 200 {
+		t.Fatal(w.Body.String())
+	}
+	got, _ = s.Store.Document(d.ID)
+	if got.Title != "random" || got.Metadata.SuggestedTitle != "" {
+		t.Fatalf("dismiss: %+v", got)
+	}
+	_, _ = s.applyFound(d.ID, PaperMetadata{}, "Suggested Title", "ai", "notFound")
+	w = request(t, s, "PATCH", "/api/documents/"+d.ID, strings.NewReader(`{"title":"Suggested Title","metadata":{"suggestedTitle":""}}`))
+	if w.Code != 200 {
+		t.Fatal(w.Body.String())
+	}
+	got, _ = s.Store.Document(d.ID)
+	if got.Title != "Suggested Title" || got.Metadata.SuggestedTitle != "" || got.Metadata.Sources["title"] != "manual" {
+		t.Fatalf("apply: %+v", got)
 	}
 }
