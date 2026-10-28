@@ -53,7 +53,7 @@ const focusWindow = () => void window.neoreadDesktop?.focusWindow?.();
  * Receives commands from the Word and WPS plugins and runs them with the
  * library open in this window. Dialogs take focus; refreshes run unseen.
  */
-export function CiteHost() {
+export function CiteHost({ standalone = false }: { standalone?: boolean }) {
   const [request, setRequest] = useState<Request | null>(null);
   const documents = useReaderStore((s) => s.documents);
 
@@ -61,8 +61,22 @@ export function CiteHost() {
     const controller = new AbortController();
     // An object, so the cleanup below sees assignments made inside `run`.
     const active: {
-      current: { transaction: string; cancel: () => void } | null;
+      current: {
+        transaction: string;
+        cancel: () => void;
+        dismiss: () => void;
+      } | null;
     } = { current: null };
+
+    const removeClose = standalone
+      ? window.neoreadDesktop?.onCitationClose?.(() =>
+          active.current?.dismiss(),
+        )
+      : undefined;
+    const show = () =>
+      standalone
+        ? void window.neoreadDesktop?.setCitationVisible?.(true)
+        : focusWindow();
 
     const run = async (
       event: Extract<CiteEvent, { type: "command" }>,
@@ -72,6 +86,7 @@ export function CiteHost() {
       let pending: (() => void) | null = null;
       active.current = {
         transaction,
+        dismiss: () => pending?.(),
         cancel: () => {
           cancelled = true;
           pending?.();
@@ -85,8 +100,12 @@ export function CiteHost() {
       ) =>
         new Promise<T>((resolve) => {
           if (cancelled) return resolve(cancelValue);
-          focusWindow();
-          pending = () => resolve(cancelValue);
+          show();
+          pending = () => {
+            pending = null;
+            setRequest(null);
+            resolve(cancelValue);
+          };
           setRequest(
             make((value) => {
               pending = null;
@@ -131,6 +150,8 @@ export function CiteHost() {
       try {
         if (!commands.includes(event.command as CiteCommand))
           throw new Error("Reader 版本过旧，不支持这个命令");
+        if (standalone)
+          useReaderStore.getState().setDocuments(await api.documents());
         // citeproc loads with the first command, not with the app.
         const { CiteSession } = await import("./session");
         await new CiteSession(
@@ -144,6 +165,10 @@ export function CiteHost() {
       } finally {
         active.current = null;
         setRequest(null);
+        if (standalone)
+          await window.neoreadDesktop
+            ?.setCitationVisible?.(false)
+            .catch(() => {});
         if (!cancelled)
           await api
             .citeComplete(transaction, { activate: true, error })
@@ -152,7 +177,7 @@ export function CiteHost() {
     };
 
     const onEvent = (event: CiteEvent) => {
-      if (event.type === "focus") focusWindow();
+      if (event.type === "focus") show();
       else if (event.type === "aborted") {
         if (active.current?.transaction === event.transaction) {
           active.current.cancel();
@@ -174,9 +199,10 @@ export function CiteHost() {
     })();
     return () => {
       controller.abort();
+      removeClose?.();
       active.current?.cancel();
     };
-  }, []);
+  }, [standalone]);
 
   if (!request) return null;
   if (request.kind === "citation")

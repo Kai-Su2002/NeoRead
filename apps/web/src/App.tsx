@@ -992,7 +992,7 @@ export function App() {
           onChoose={(library) => void importLargePapers(library)}
           onCancel={() => setLargePapers([])}
         />
-        <CiteHost />
+        {!window.neoreadDesktop?.setCitationVisible && <CiteHost />}
         <Toaster
           richColors
           position="bottom-right"

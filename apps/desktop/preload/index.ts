@@ -87,6 +87,13 @@ contextBridge.exposeInMainWorld("neoreadDesktop", {
   openDocumentFile: (id: string, type: "pdf" | "epub") =>
     ipcRenderer.invoke("neoread:document-file", id, type, "open"),
   focusWindow: () => ipcRenderer.invoke("neoread:focus-window"),
+  setCitationVisible: (visible: boolean) =>
+    ipcRenderer.invoke("neoread:citation-visible", visible),
+  onCitationClose: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on("neoread:citation-close", listener);
+    return () => ipcRenderer.removeListener("neoread:citation-close", listener);
+  },
   citePlugins: () => proxyRequest("neoread:cite-plugins"),
   installCitePlugin: (kind: "word" | "wps") =>
     proxyRequest("neoread:cite-plugin-install", kind),

@@ -48,6 +48,7 @@ import { startDiagnosticService } from "./diagnostic-service";
 import { serverSpawnDiagnostics } from "./server-spawn-diagnostics";
 import { discoverEndNote } from "./endnote-discovery";
 import { commandLineStatus, setCommandLine } from "./command-line";
+import { createCitationWindow } from "./citation-window";
 import {
   citePluginStatus,
   installCitePlugin,
@@ -1013,6 +1014,13 @@ app
     await window.loadURL(
       `${url}/${recoveryServer ? "?libraryRecovery=1" : ""}#token=${serverToken}`,
     );
+    if (!recoveryServer)
+      await createCitationWindow({
+        url,
+        token: serverToken,
+        preload: join(__dirname, "preload.cjs"),
+        backgroundColor: windowBackground(appearance, preferences),
+      });
     if (migration && !recoveryServer)
       await promptLegacyCleanup(
         window,
