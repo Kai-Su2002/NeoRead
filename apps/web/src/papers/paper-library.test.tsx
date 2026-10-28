@@ -176,19 +176,13 @@ it("shows details on click and saves an edited field as manual metadata", async 
   });
 });
 
-it("hides empty publication fields until expanded while keeping filled fields visible", async () => {
+it("hides empty publication fields while keeping filled fields visible", async () => {
   await act(async () => row("Attention Is All You Need").click());
   const detail = host.querySelector(".paper-detail")!;
   expect(detail.querySelector('[aria-label="出处"]')).not.toBeNull();
   expect(detail.querySelector('[aria-label="卷"]')).toBeNull();
-  expect(button("展开空字段").getAttribute("aria-expanded")).toBe("false");
-  await act(async () => button("展开空字段").click());
-  expect(detail.querySelector('[aria-label="卷"]')).not.toBeNull();
-  expect(detail.querySelector('[aria-label="短标题"]')).not.toBeNull();
-  expect(button("收起空字段").getAttribute("aria-expanded")).toBe("true");
-  await act(async () => button("收起空字段").click());
-  expect(detail.querySelector('[aria-label="卷"]')).toBeNull();
-  expect(detail.querySelector('[aria-label="出处"]')).not.toBeNull();
+  expect(detail.querySelector('[aria-label="短标题"]')).toBeNull();
+  expect(host.textContent).not.toContain("展开空字段");
 });
 
 it("selects all visible papers and changes their status together", async () => {
