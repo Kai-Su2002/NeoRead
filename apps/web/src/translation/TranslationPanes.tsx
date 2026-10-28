@@ -52,8 +52,8 @@ export function TranslationPanes({
     );
   }, [mode, swapped, stacked, sourcePanel]);
 
-  // Stable React keys preserve the PDF instance when the panels change sides.
-  // Positional panel IDs also refresh the resize library's panel ordering.
+  // Keep DOM order stable: reinserting a panel resets descendant scroll positions.
+  // CSS order swaps sides; positional IDs refresh the resize library's ordering.
   const panels = [
     <ResizablePanel
       key="source"
@@ -92,6 +92,7 @@ export function TranslationPanes({
       className="translation-panes"
       data-mode={mode}
       data-stacked={stacked || undefined}
+      data-swapped={swapped || undefined}
     >
       <ResizablePanelGroup
         orientation={stacked ? "vertical" : "horizontal"}
@@ -118,7 +119,7 @@ export function TranslationPanes({
           }
         }}
       >
-        {swapped ? panels.reverse() : panels}
+        {panels}
       </ResizablePanelGroup>
       {/* Overlay the divider outside the group so its capture-phase drag handler
           does not consume pointer events intended for these buttons. */}

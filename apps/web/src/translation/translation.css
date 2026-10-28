@@ -25,6 +25,13 @@
   min-height: 0;
   min-width: 0;
 }
+/* Order the outer panel elements; Panel's style prop targets its inner content. */
+.translation-panes[data-swapped] > [data-group] > :first-child {
+  order: 2;
+}
+.translation-panes[data-swapped] > [data-group] > [data-separator] {
+  order: 1;
+}
 .translation-source {
   position: relative;
   flex: 1;

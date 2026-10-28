@@ -55,14 +55,19 @@ function width(element: HTMLElement): number {
   if (element.hasAttribute("data-separator")) return element.hidden ? 0 : 1;
   return 1001;
 }
+function visualChildren(element: Element): HTMLElement[] {
+  const children = [...element.children] as HTMLElement[];
+  // Mirror translation.css: only the group's direct children change order.
+  return element.hasAttribute("data-group") &&
+    element.parentElement?.hasAttribute("data-swapped")
+    ? children.reverse()
+    : children;
+}
 function left(element: HTMLElement): number {
   let offset = 0;
-  for (
-    let sibling = element.previousElementSibling;
-    sibling;
-    sibling = sibling.previousElementSibling
-  ) {
-    offset += width(sibling as HTMLElement);
+  for (const sibling of visualChildren(element.parentElement!)) {
+    if (sibling === element) break;
+    offset += width(sibling);
   }
   return offset;
 }
@@ -176,7 +181,9 @@ it("resizes by pointer in both orders and retains the PDF instance and chosen wi
   await click("交换原文和译文");
   expect(sourceSize()).toBeCloseTo(60);
   const group = host.querySelector("[data-group]")!;
-  expect(group.lastElementChild!.querySelector("[data-source]")).not.toBeNull();
+  expect(
+    visualChildren(group).at(-1)!.querySelector("[data-source]"),
+  ).not.toBeNull();
   await drag(100);
   expect(sourceSize()).toBeCloseTo(50);
   await drag(-150);
@@ -257,9 +264,8 @@ it("restores the last source width and order after leaving a document, without s
   await click("parallel");
   expect(sourceSize()).toBeCloseTo(60);
   expect(
-    host
-      .querySelector("[data-group]")!
-      .lastElementChild!.querySelector("[data-source]"),
+    visualChildren(host.querySelector("[data-group]")!)
+      .at(-1)!.querySelector("[data-source]"),
   ).not.toBeNull();
 });
 
@@ -291,6 +297,41 @@ it("stacks source and translation top and bottom without remounting the source",
   expect(mount).toHaveBeenCalledTimes(1);
   expect(unmount).not.toHaveBeenCalled();
 });
+
+it.each([false, true])(
+  "swaps panes without moving scroll containers in the DOM (stacked=%s)",
+  async (stacked) => {
+    await click("parallel");
+    if (stacked) await click("上下排列");
+    const group = host.querySelector("[data-group]")!;
+    const source = host.querySelector<HTMLElement>("[data-source]")!;
+    const translation = group.lastElementChild!.firstElementChild as HTMLElement;
+    source.scrollTop = 7245;
+    source.scrollLeft = 35;
+    translation.scrollTop = 1234;
+    const children = [...group.children];
+    // jsdom does not reset scroll on DOM reinsertion as browsers do. Assert
+    // that swapping never removes/reinserts the panels containing either view.
+    const mutations: MutationRecord[] = [];
+    const observer = new MutationObserver((records) => mutations.push(...records));
+    observer.observe(group, { childList: true });
+    try {
+      for (const swapped of [true, false, true]) {
+        await click("交换原文和译文");
+        expect([...mutations, ...observer.takeRecords()]).toEqual([]);
+        expect([...group.children]).toEqual(children);
+        expect(
+          visualChildren(group).at(swapped ? -1 : 0)!.contains(source),
+        ).toBe(true);
+        expect(source.scrollTop).toBe(7245);
+        expect(source.scrollLeft).toBe(35);
+        expect(translation.scrollTop).toBe(1234);
+      }
+    } finally {
+      observer.disconnect();
+    }
+  },
+);
 
 it("hides the layout controls outside parallel mode", async () => {
   expect(host.querySelector('[aria-label="上下排列"]')).toBeNull();
