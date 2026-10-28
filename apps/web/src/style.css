@@ -3186,24 +3186,32 @@ body[data-resizing] * {
   gap: 14px;
   padding: 20px 20px 28px;
 }
-.paper-title-suggestion {
+.paper-title-suggestion.paper-title-suggestion {
   position: relative;
   display: flex;
   align-items: flex-start;
   width: fit-content;
+  min-width: 0;
   max-width: 100%;
+  flex-shrink: 1;
   margin-top: -8px;
   border-radius: 8px;
   background: color-mix(in oklch, var(--foreground) 6%, transparent);
 }
 .paper-title-suggestion-apply.paper-title-suggestion-apply {
   min-width: 0;
+  max-width: 100%;
   height: auto;
   padding: 5px 30px 5px 9px;
-  white-space: normal;
+  justify-content: flex-start;
   text-align: left;
-  overflow-wrap: anywhere;
   font-weight: 400;
+}
+.paper-title-suggestion-apply > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .paper-title-suggestion-dismiss.paper-title-suggestion-dismiss {
   position: absolute;

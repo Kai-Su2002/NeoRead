@@ -230,6 +230,7 @@ export function PaperDetail({
               size="sm"
               className="paper-title-suggestion-apply"
               aria-label={`应用 AI 建议标题：${m.suggestedTitle}`}
+              title={m.suggestedTitle}
               onClick={() =>
                 void patchPapers([
                   [
