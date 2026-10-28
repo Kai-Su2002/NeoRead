@@ -71,6 +71,7 @@ type Server struct {
 	blockedProcessing      map[string]bool
 	modelMu                sync.Mutex
 	modelCache             map[string]modelCatalogEntry
+	paperRefresh           paperRefreshState
 	scholarMu              sync.Mutex
 	scholar                *scholar.Client
 	journalRankMu          sync.Mutex
@@ -106,6 +107,8 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/diagnostics/events", s.recordDiagnostic)
 	mux.HandleFunc("GET /api/diagnostics/export", s.exportDiagnostics)
+	mux.HandleFunc("GET /api/diagnostics/paper-refresh", s.paperRefreshStatus)
+	mux.HandleFunc("POST /api/diagnostics/paper-refresh", s.startPaperRefresh)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("GET /api/documents", func(w http.ResponseWriter, r *http.Request) {
 		v, e := s.Store.Documents()

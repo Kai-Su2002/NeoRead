@@ -11,6 +11,20 @@ import { useReaderStore } from "./store";
 vi.mock("@neoread/api", () => ({
   api: {
     connectorStatus: vi.fn(async () => ({ available: true })),
+    paperRefreshStatus: vi.fn(async () => ({
+      status: "idle",
+      total: 0,
+      processed: 0,
+      failed: 0,
+      skipped: 0,
+    })),
+    startPaperRefresh: vi.fn(async () => ({
+      status: "done",
+      total: 0,
+      processed: 0,
+      failed: 0,
+      skipped: 0,
+    })),
     journalRankConfig: vi.fn(async () => ({
       enabled: true,
       hasKey: false,
@@ -194,6 +208,13 @@ it("groups proxy settings and log export under diagnostics without a network tab
   const panel = input("代理地址").closest('[role="tabpanel"]')!;
   expect(panel.getAttribute("aria-labelledby")).toBe(diagnostics.id);
   expect(panel.textContent).toContain("chatgpt.com/robots.txt");
+  expect(panel.textContent).toContain("重新识别论文标题，并查找论文信息");
+  const startButton = Array.from(
+    panel.querySelectorAll<HTMLButtonElement>("button"),
+  ).find((button) => button.textContent === "开始")!;
+  await act(async () => startButton.click());
+  expect(api.startPaperRefresh).toHaveBeenCalled();
+  expect(panel.textContent).toContain("处理完成：0/0 篇");
   const exportButton = Array.from(
     panel.querySelectorAll<HTMLButtonElement>("button"),
   ).find((button) => button.textContent === "导出全部日志")!;

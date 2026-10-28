@@ -497,6 +497,8 @@ func (s *Server) StartProcessing(parent context.Context) func() {
 	go func() { defer workers.Done(); s.classificationWorker(ctx) }()
 	workers.Add(1)
 	go func() { defer workers.Done(); s.metadataWorker(ctx) }()
+	workers.Add(1)
+	go func() { defer workers.Done(); s.paperRefreshWorker(ctx) }()
 	return func() { cancel(); workers.Wait() }
 }
 func (s *Server) wakeProcessing() {

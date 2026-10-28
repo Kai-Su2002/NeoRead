@@ -46,15 +46,27 @@ func (s *Server) quickPaperMetadata(ctx context.Context, d Document) (quickPaper
 	return result, err
 }
 
-func (s *Server) autoPaperLookup(ctx context.Context, id string) (Document, error) {
+func (s *Server) autoPaperLookup(ctx context.Context, id string, preserveManual ...bool) (Document, error) {
 	d, err := s.Store.Document(id)
 	if err != nil {
 		return d, err
+	}
+	if len(preserveManual) > 0 && preserveManual[0] && d.Metadata.Sources["title"] == "manual" {
+		return s.lookupDocument(ctx, id, true)
 	}
 	quick, err := s.quickPaperMetadata(ctx, d)
 	if err != nil {
 		s.diagnosticEvent(slog.LevelWarn, "paper.metadata.extract", "documentId", id, "outcome", "failed", "reason", "extract_failed")
 		return s.lookupDocument(ctx, id, false)
+	}
+	if len(preserveManual) > 0 && preserveManual[0] {
+		latest, e := s.Store.Document(id)
+		if e != nil {
+			return d, e
+		}
+		if latest.Metadata.Sources["title"] == "manual" {
+			return s.lookupDocument(ctx, id, true)
+		}
 	}
 	s.diagnosticEvent(slog.LevelInfo, "paper.metadata.extract", "documentId", id, "outcome", "success", "pages", len(quick.Pages))
 	ids := scholar.Identifiers{DOI: d.Metadata.DOI, ArXiv: d.Metadata.ArXiv}
@@ -80,6 +92,15 @@ func (s *Server) autoPaperLookup(ctx context.Context, id string) (Document, erro
 	if title != "" {
 		return s.applyFound(id, PaperMetadata{}, title, "file", "notFound")
 	}
+	if len(preserveManual) > 0 && preserveManual[0] {
+		latest, e := s.Store.Document(id)
+		if e != nil {
+			return d, e
+		}
+		if latest.Metadata.Sources["title"] == "manual" {
+			return latest, lookupErr
+		}
+	}
 	config := s.aiConfig()
 	if !validAgent(config.Primary) || !(primaryCapable(config, taskTranslation) || capable(config, "text-api", false)) || len(quick.Pages) == 0 || strings.TrimSpace(quick.Pages[0]) == "" {
 		return d, lookupErr
@@ -104,6 +125,15 @@ func (s *Server) autoPaperLookup(ctx context.Context, id string) (Document, erro
 	title = strings.Join(strings.Fields(response.Title), " ")
 	if title == "" || len([]rune(title)) > 300 {
 		return d, lookupErr
+	}
+	if len(preserveManual) > 0 && preserveManual[0] {
+		latest, e := s.Store.Document(id)
+		if e != nil {
+			return d, e
+		}
+		if latest.Metadata.Sources["title"] == "manual" {
+			return latest, lookupErr
+		}
 	}
 	updated, err := s.applyFound(id, PaperMetadata{}, title, "ai", "notFound")
 	if err == nil {

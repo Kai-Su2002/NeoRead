@@ -952,6 +952,50 @@
                 },
             },
         },
+      "/api/diagnostics/paper-refresh":
+        {
+          "get":
+            {
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "Paper refresh progress",
+                      "content":
+                        {
+                          "application/json":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/PaperRefreshProgress",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+          "post":
+            {
+              "responses":
+                {
+                  "202":
+                    {
+                      "description": "Paper refresh started",
+                      "content":
+                        {
+                          "application/json":
+                            {
+                              "schema":
+                                {
+                                  "$ref": "#/components/schemas/PaperRefreshProgress",
+                                },
+                            },
+                        },
+                    },
+                  "409": { "description": "A refresh is already running" },
+                },
+            },
+        },
       "/api/diagnostics/export":
         {
           "get":
@@ -5547,6 +5591,23 @@
       "securitySchemes": { "session": { "type": "http", "scheme": "bearer" } },
       "schemas":
         {
+          "PaperRefreshProgress":
+            {
+              "type": "object",
+              "required": ["status", "total", "processed", "failed", "skipped"],
+              "properties":
+                {
+                  "status":
+                    {
+                      "type": "string",
+                      "enum": ["idle", "running", "done", "interrupted"],
+                    },
+                  "total": { "type": "integer" },
+                  "processed": { "type": "integer" },
+                  "failed": { "type": "integer" },
+                  "skipped": { "type": "integer" },
+                },
+            },
           "PaperAttachment":
             {
               "type": "object",

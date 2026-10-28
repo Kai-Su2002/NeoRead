@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { LegacyAnnotationMigration } from "./LegacyAnnotationMigration";
 import { DiagnosticExport } from "./DiagnosticExport";
+import { PaperRefreshSettings } from "./PaperRefreshSettings";
 import { LibraryLocationSettings } from "./LibraryLocationSettings";
 import { CommandLineSettings } from "./CommandLineSettings";
 import { ProviderIdentity, providerLabel } from "./ProviderIdentity";
@@ -760,6 +761,9 @@ export function Settings({
             {window.neoreadDesktop?.proxySettings && (
               <ProxySettings open={open} />
             )}
+            <section>
+              <PaperRefreshSettings open={open} />
+            </section>
             <section>
               <LegacyAnnotationMigration />
             </section>

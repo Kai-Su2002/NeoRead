@@ -166,7 +166,16 @@ function annotationRequest<T>(path: string, init: RequestInit): Promise<T> {
 export type ZoteroScan = components["schemas"]["ZoteroScan"];
 export type ZoteroImportResult = components["schemas"]["ZoteroImportResult"];
 export type PaperAttachment = components["schemas"]["PaperAttachment"];
+export type PaperRefreshProgress =
+  components["schemas"]["PaperRefreshProgress"];
+
 export const api = {
+  paperRefreshStatus: () =>
+    request<PaperRefreshProgress>("/api/diagnostics/paper-refresh"),
+  startPaperRefresh: () =>
+    request<PaperRefreshProgress>("/api/diagnostics/paper-refresh", {
+      method: "POST",
+    }),
   paperAttachments: (id: string) =>
     request<PaperAttachment[]>(
       `/api/documents/${encodeURIComponent(id)}/attachments`,
