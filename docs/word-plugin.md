@@ -9,6 +9,8 @@
 - **Microsoft Word**（Windows、macOS 桌面版）：先退出 Word 再点“安装”。NeoRead 把 `NeoRead.dotm` 放进 Word 启动文件夹；macOS 上还会把发请求用的 `NeoReadCite.scpt` 编译到 `~/Library/Application Scripts/com.microsoft.Word/`。重新启动 Word 后出现“NeoRead”选项卡。
 - **WPS 文字**（Windows）：点“安装”后，NeoRead 在 `%APPDATA%\kingsoft\wps\jsaddons` 的 `jsplugins.xml`、`publish.xml` 中登记加载项，地址为 `http://127.0.0.1:17841/wps/<安装密钥>/`。WPS 在启动时从 NeoRead 加载这个页面，所以 **WPS 启动时 NeoRead 必须已经在运行**，否则本次不会出现“NeoRead”选项卡。macOS 版 WPS 的加载项目录尚未验证，暂不支持。
 
+**更新插件**：升级 NeoRead 后，退出 Word，在此处点击“重新安装”即可直接覆盖已有的 `NeoRead.dotm` 和 macOS 脚本，再启动 Word。无需先卸载。WPS 通过重新安装更新登记信息，插件页面由正在运行的 NeoRead 提供。
+
 macOS 的默认启动目录为 `~/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/Word/`。安装或卸载遇到访问限制时，会打开系统文件夹选择窗口；选择当前指定的文件夹并点“允许访问”，随后重试操作。模板与 AppleScript 目录可能分别请求授权，取消授权后可再次点击安装。Finder 中可能隐藏目录名称的 `.localized` 后缀。
 
 Windows 优先读取 Office 注册表中的 Word 启动目录设置（包含 32/64 位注册表视图）；没有自定义配置时使用 `%APPDATA%\Microsoft\Word\STARTUP`，并检查商店版 Office 已存在的启动目录。安装、状态检测和卸载使用相同的目录解析。权限不足时不会自动提权或修改目录权限；先退出 Word，再检查该目录的写入权限。

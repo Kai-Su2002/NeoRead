@@ -102,6 +102,46 @@ HKEY_CURRENT_USER\Software\Microsoft\Office\17.0\Word\Options
 });
 
 describe("installing", () => {
+  it.each(["darwin", "win32"] as const)(
+    "overwrites an installed Word plugin on %s without uninstalling",
+    async (platform) => {
+      const { options } = await setup(platform);
+      await mkdir(
+        platform === "darwin"
+          ? join(options.home, "Library/Group Containers/UBF8T346G9.Office")
+          : join(options.appData, "Microsoft/Word"),
+        { recursive: true },
+      );
+      await installCitePlugin("word", options);
+      await writeFile(
+        join(options.plugins, "word/NeoRead.dotm"),
+        "updated template",
+      );
+      options.compileAppleScript = vi.fn(async (_source, target) => {
+        await writeFile(target, "updated script");
+      });
+      await installCitePlugin("word", options);
+      const target =
+        platform === "darwin"
+          ? join(
+              options.home,
+              "Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/Word/NeoRead.dotm",
+            )
+          : join(options.appData, "Microsoft/Word/STARTUP/NeoRead.dotm");
+      expect(await readFile(target, "utf8")).toBe("updated template");
+      if (platform === "darwin")
+        expect(
+          await readFile(
+            join(
+              options.home,
+              "Library/Application Scripts/com.microsoft.Word/NeoReadCite.scpt",
+            ),
+            "utf8",
+          ),
+        ).toBe("updated script");
+      expect((await citePluginStatus(options))[0].installed).toBe(true);
+    },
+  );
   it("replaces the legacy Word template only after installing NeoRead", async () => {
     const { options } = await setup("win32");
     const folder = join(options.appData, "Microsoft/Word/STARTUP");
