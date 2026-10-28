@@ -333,6 +333,7 @@ export function CitationEditor({
             className="rounded-md bg-muted px-3 py-2 text-sm break-words"
             aria-label="预览"
           >
+            <span className="text-muted-foreground">引注样式预览：</span>
             <RunsText runs={preview} />
           </p>
         )}
