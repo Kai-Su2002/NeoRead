@@ -54,6 +54,7 @@ import {
   documentTabsShown,
 } from "./store";
 import { TrashView } from "./TrashView";
+import { useCardZoom } from "./useCardZoom";
 import { PaperLibrary } from "./papers/PaperLibrary";
 import { PaperSidebar } from "./papers/PaperSidebar";
 import { usePaperUI } from "./papers/state";
@@ -115,6 +116,20 @@ export function App() {
   const [editingLibrary, setEditingLibrary] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [libraryBody, setLibraryBody] = useState<HTMLDivElement | null>(null);
+  const [bookPane, setBookPane] = useState<HTMLDivElement | null>(null);
+  const bookScale = libraryPreferences.books?.cardScale || 1;
+  useCardZoom(
+    bookPane,
+    !active && !papers && libraryView === "grid" && filter !== "trash",
+    bookScale,
+    (cardScale) =>
+      void updateLibraryPreferences({
+        books: {
+          ...useReaderStore.getState().libraryPreferences.books,
+          cardScale,
+        },
+      }).catch((e) => toast.error(e.message)),
+  );
   const pressedEmpty = useRef(false);
   const [overviewDocument, setOverviewDocument] = useState<Document | null>(
     null,
@@ -725,7 +740,11 @@ export function App() {
                   )}
                 </header>
                 <div className="book-library-body" ref={setLibraryBody}>
-                  <div className="book-list-pane">
+                  <div
+                    className="book-list-pane"
+                    ref={setBookPane}
+                    style={{ "--card-scale": bookScale } as React.CSSProperties}
+                  >
                     <div className="library-content">
                       {filter === "favorites" && (
                         <div className="library-controls">

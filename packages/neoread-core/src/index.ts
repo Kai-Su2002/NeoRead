@@ -200,7 +200,12 @@ export interface PaperLibraryPreferences {
   sort?: PaperSort;
   /** Reverse the natural order of `sort`. */
   sortReverse?: boolean;
-  layout?: "list" | "table";
+  /** Paper display; cards by default, and a legacy "list" also shows as cards. */
+  layout?: "card" | "table";
+  /** Show author names under paper titles (default on). */
+  showAuthors?: boolean;
+  /** Size of paper cards relative to the default. */
+  cardScale?: number;
   /** Visible table columns in order. */
   columns?: PaperColumn[];
   /** Whether the title column is shown (default on). */
@@ -232,6 +237,8 @@ export interface LibraryPreferences {
   books?: {
     /** Width of the book detail panel in CSS pixels. */
     detailWidth?: number;
+    /** Size of book cards relative to the default. */
+    cardScale?: number;
   };
 }
 /** First-run guide and release notes, stored with the library. */

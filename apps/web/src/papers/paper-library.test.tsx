@@ -41,6 +41,8 @@ vi.mock("@neoread/api", () => ({
     process: vi.fn(async () => ({})),
     setAssistance: vi.fn(async () => ({})),
   },
+  coverURL: (id: string) => `/covers/${id}`,
+  publicationURL: (id: string, path: string) => `/publications/${id}/${path}`,
 }));
 vi.mock("./AttachmentPreview", () => ({
   default: () => <div role="dialog">Attachment preview</div>,
@@ -534,7 +536,7 @@ it("tags a paper and collects it in a smart tag category", async () => {
   expect(host.querySelectorAll("[data-paper-id]")).toHaveLength(1);
 });
 
-it.each(["list", "table"] as const)(
+it.each(["card", "table"] as const)(
   "retries a failed translation in %s view without opening the paper or posting twice",
   async (layout) => {
     jobs = new Map([
@@ -677,7 +679,7 @@ it("resizes table columns at their shared boundary", async () => {
   rects.mockRestore();
 });
 
-it.each(["list", "table"] as const)(
+it.each(["card", "table"] as const)(
   "does not show paused Zotero imports as parsing in %s view",
   async (layout) => {
     jobs = new Map([
@@ -834,7 +836,7 @@ it("shows optional metadata columns and sorts publication dates without inventin
   expect(api.saveLibraryPreferences).toHaveBeenCalled();
 });
 
-it.each(["list", "table"] as const)(
+it.each(["card", "table"] as const)(
   "shows manual translation after parsing in %s view",
   async (layout) => {
     const job: Processing = {
@@ -877,7 +879,7 @@ it.each(["list", "table"] as const)(
   },
 );
 
-it.each(["list", "table"] as const)(
+it.each(["card", "table"] as const)(
   "combines temporary tags with search in the %s view and clears only tags",
   async (layout) => {
     await act(async () => {
@@ -1072,7 +1074,7 @@ it("defaults tags to the second column and has no extra tag toolbar button", asy
   expect(host.querySelector('[aria-label="打开标签筛选"]')).toBeNull();
   await act(async () =>
     useReaderStore.setState({
-      libraryPreferences: { mode: "papers", papers: { layout: "list" } },
+      libraryPreferences: { mode: "papers", papers: { layout: "card" } },
     }),
   );
   expect(host.querySelector('[aria-label="打开标签筛选"]')).toBeNull();
@@ -1181,7 +1183,7 @@ const dragColumn = async (element: Element, type: string, x = 0, y = 0) => {
   await act(async () => element.dispatchEvent(event));
   return transfer;
 };
-it.each(["list", "table"] as const)(
+it.each(["card", "table"] as const)(
   "uses a compact independent drag image in %s view without changing selected paper IDs",
   async (view) => {
     vi.stubGlobal(
@@ -1534,7 +1536,7 @@ it.each([
         useReaderStore.setState({
           libraryPreferences: {
             ...saved,
-            papers: { ...saved.papers, layout: "list" },
+            papers: { ...saved.papers, layout: "card" },
           },
         }),
       );
@@ -1639,11 +1641,23 @@ const supplement = {
   url: "",
   createdAt: "2026-10-23T00:00:00Z",
 };
-it("expands child attachments in both list and table without adding paper selections", async () => {
+it("expands child attachments in the table without adding paper selections", async () => {
   vi.mocked(api.paperAttachments).mockResolvedValue([supplement]);
   await act(async () =>
     useReaderStore.setState({
       documents: [{ ...docs[0], attachmentCount: 1 }, docs[1]],
+    }),
+  );
+  // Cards keep attachments in the detail panel instead of inline rows.
+  expect(
+    host.querySelector('[aria-label="展开 Attention Is All You Need 的附件"]'),
+  ).toBeNull();
+  await act(async () =>
+    useReaderStore.setState({
+      libraryPreferences: {
+        mode: "papers",
+        papers: { sort: "title", layout: "table" },
+      },
     }),
   );
   await act(async () =>
@@ -1701,6 +1715,10 @@ it("expands and collapses attachment children with the keyboard", async () => {
   await act(async () =>
     useReaderStore.setState({
       documents: [{ ...docs[0], attachmentCount: 1 }, docs[1]],
+      libraryPreferences: {
+        mode: "papers",
+        papers: { sort: "title", layout: "table" },
+      },
     }),
   );
   await act(async () =>
@@ -1727,6 +1745,10 @@ it("opens attachment rename and removal from the child context menu", async () =
   await act(async () =>
     useReaderStore.setState({
       documents: [{ ...docs[0], attachmentCount: 1 }, docs[1]],
+      libraryPreferences: {
+        mode: "papers",
+        papers: { sort: "title", layout: "table" },
+      },
     }),
   );
   await act(async () =>
@@ -1767,7 +1789,7 @@ it("opens attachment rename and removal from the child context menu", async () =
   );
 });
 
-it.each(["list", "table"] as const)(
+it.each(["table"] as const)(
   "accepts direct file drops on expanded parent and child rows in %s layout",
   async (layout) => {
     const upload = vi
@@ -2349,6 +2371,96 @@ it("opens picked papers together in document tabs and exits batch mode", async (
       .sort(),
   );
   expect(usePaperUI.getState().picking).toBe(false);
+});
+
+it("shows papers as cover cards and author lines that follow the setting", async () => {
+  expect(host.querySelectorAll(".paper-card")).toHaveLength(2);
+  const card = host.querySelector<HTMLElement>('[data-paper-id="a"]')!;
+  expect(card.querySelector(".paper-card-cover img")).not.toBeNull();
+  expect(card.querySelector(".paper-row-byline")?.textContent).toBe(
+    "Ashish Vaswani",
+  );
+  await act(async () =>
+    useReaderStore.setState({
+      libraryPreferences: {
+        mode: "papers",
+        papers: { sort: "title", layout: "table", columns: ["year"] },
+      },
+    }),
+  );
+  const row = () => host.querySelector<HTMLElement>('[data-paper-id="a"]')!;
+  expect(row().querySelector(".paper-row-byline")?.textContent).toBe(
+    "Ashish Vaswani",
+  );
+  await act(async () =>
+    useReaderStore.setState({
+      libraryPreferences: {
+        mode: "papers",
+        papers: { sort: "title", layout: "table" },
+      },
+    }),
+  );
+  expect(row().querySelector(".paper-row-byline")?.textContent).toBe(
+    "Ashish Vaswani",
+  );
+  await act(async () =>
+    useReaderStore.setState({
+      libraryPreferences: {
+        mode: "papers",
+        papers: {
+          sort: "title",
+          layout: "table",
+          columns: ["year"],
+          showAuthors: false,
+        },
+      },
+    }),
+  );
+  expect(row().querySelector(".paper-row-byline")).toBeNull();
+});
+
+it("resizes paper cards with Cmd and the wheel or plus and minus keys", async () => {
+  const scale = () =>
+    useReaderStore.getState().libraryPreferences.papers?.cardScale;
+  const pane = host.querySelector<HTMLElement>(".paper-list-pane")!;
+  await act(async () =>
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "=", metaKey: true }),
+    ),
+  );
+  expect(scale()).toBe(1.15);
+  expect(pane.style.getPropertyValue("--card-scale")).toBe("1.15");
+  await act(async () =>
+    pane.dispatchEvent(
+      new WheelEvent("wheel", {
+        deltaY: 60,
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    ),
+  );
+  expect(scale()).toBe(1);
+  await act(async () =>
+    pane.dispatchEvent(
+      new WheelEvent("wheel", { deltaY: 60, bubbles: true, cancelable: true }),
+    ),
+  );
+  expect(scale()).toBe(1);
+  await act(async () =>
+    useReaderStore.setState({
+      libraryPreferences: {
+        mode: "papers",
+        papers: { sort: "title", layout: "table" },
+      },
+    }),
+  );
+  await act(async () =>
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "-", metaKey: true }),
+    ),
+  );
+  expect(scale()).toBeUndefined();
 });
 
 it("applies or dismisses a suggested AI title", async () => {

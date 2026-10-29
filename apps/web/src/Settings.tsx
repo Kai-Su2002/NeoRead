@@ -1074,6 +1074,26 @@ export function Settings({
             )}
             <CitePluginSettings open={open} />
             <section>
+              <h3 className="mb-3 text-sm font-medium">显示设置</h3>
+              <label className="flex items-start gap-2 text-sm">
+                <Checkbox
+                  className="mt-0.5"
+                  checked={paperPreferences.showAuthors !== false}
+                  onCheckedChange={(checked) =>
+                    void updateLibraryPreferences({
+                      papers: { ...paperPreferences, showAuthors: !!checked },
+                    }).catch((e) => toast.error(e.message))
+                  }
+                />
+                <span>
+                  论文显示作者名字
+                  <span className="block text-xs text-muted-foreground">
+                    在表格和卡片中的标题下方显示
+                  </span>
+                </span>
+              </label>
+            </section>
+            <section>
               <h3 className="mb-3 text-sm font-medium">导入设置</h3>
               <label className="flex items-start gap-2 text-sm">
                 <Checkbox
