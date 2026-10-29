@@ -219,6 +219,14 @@ svg:is(.lucide-trash, .lucide-trash-2) {
   color: var(--destructive) !important;
 }
 /* The citation window is transparent and sized to its dialog. */
+html[data-citation-window] {
+  --text-xs: 0.625rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.875rem;
+}
+html[data-citation-window] body {
+  font-size: 0.75rem;
+}
 html[data-citation-window],
 html[data-citation-window] body {
   background: transparent;
