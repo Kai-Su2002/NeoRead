@@ -287,12 +287,8 @@ export function PDFReadingView({
       }
     });
   };
-  const focusBlock = (
-    block: PDFBlock,
-    origin: "source" | "translation",
-    automatic = false,
-  ) => {
-    input(origin, automatic);
+  const focusBlock = (block: PDFBlock, origin: "source" | "translation") => {
+    input(origin);
     const motion = explicitFocus.current;
     const operation = motion.operation;
     motion.moving = true;
@@ -590,11 +586,33 @@ export function PDFReadingView({
         let frame = requestAnimationFrame(() => {
           frame = requestAnimationFrame(() => {
             if (cancelled || operation !== motion.operation) return;
-            focusBlock(
-              block,
-              previous === "translation" ? "translation" : "source",
-              true,
-            );
+            const anchor =
+              reading.current?.blockId === block.id
+                ? reading.current
+                : { blockId: block.id, fraction: 0.5 };
+            recordReading(anchor);
+            // Panel resize owns source scaling and its viewport center. Switching
+            // modes must not apply the zoom/panning reserved for a block click.
+            void Promise.all([
+              previous === "translation"
+                ? engine.followBlock?.(anchor)
+                : undefined,
+              followTranslation(anchor, undefined, {
+                smooth: true,
+                center: true,
+              }),
+            ])
+              .catch((e) => {
+                if (!cancelled) toast.error(e.message);
+              })
+              .finally(() => {
+                if (operation === motion.operation) {
+                  motion.moving = false;
+                  control.current.following(
+                    previous === "translation" ? "translation" : "source",
+                  );
+                }
+              });
           });
         });
         return () => {
