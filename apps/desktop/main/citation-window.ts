@@ -37,7 +37,11 @@ export async function createCitationWindow(options: {
   });
   window.setMenu(null);
   window.setAlwaysOnTop(true, "floating");
-  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Do not let Electron change the entire app into a macOS accessory app.
+  window.setVisibleOnAllWorkspaces(true, {
+    visibleOnFullScreen: true,
+    ...(process.platform === "darwin" ? { skipTransformProcessType: true } : {}),
+  });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event) => event.preventDefault());
   window.webContents.on("will-attach-webview", (event) =>

@@ -48,6 +48,10 @@ it("starts hidden, limits visibility IPC to its own main frame and cancels on cl
     preload: "/preload.cjs",
   });
   expect(state.options).toMatchObject({ show: false, frame: false });
+  expect(window.setVisibleOnAllWorkspaces).toHaveBeenCalledWith(true, {
+    visibleOnFullScreen: true,
+    ...(process.platform === "darwin" ? { skipTransformProcessType: true } : {}),
+  });
   expect(window.loadURL).toHaveBeenCalledWith(
     "http://127.0.0.1:1234/?citationWindow=1#token=test",
   );
