@@ -576,7 +576,7 @@ export function PDFReadingView({
         (b) => b.id === (enteringParallel.current ?? reading.current?.blockId),
       );
       enteringParallel.current = undefined;
-      if (block) {
+      if (block && syncEnabledRef.current) {
         // Panel resize commits and ResizeObserver callbacks can follow this effect.
         // Keep the selected block fixed until both panes have their new geometry.
         const motion = explicitFocus.current;
@@ -598,6 +598,24 @@ export function PDFReadingView({
           engine.hoverBlock?.(null);
         };
       }
+    }
+    if (previous !== mode && mode === "source") {
+      let frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => {
+          if (cancelled) return;
+          // Restore only after TranslationPanes has expanded the source panel.
+          engine.restoreSourceZoom?.();
+          if (reading.current && syncEnabledRef.current)
+            void engine.followBlock?.(reading.current).catch((e) => {
+              if (!cancelled) toast.error(e.message);
+            });
+        });
+      });
+      return () => {
+        cancelled = true;
+        cancelAnimationFrame(frame);
+        engine.hoverBlock?.(null);
+      };
     }
     const restore = async () => {
       if (
@@ -754,6 +772,9 @@ export function PDFReadingView({
     return nearest;
   };
   const changeMode = (value: Mode) => {
+    if (value === mode) return;
+    if (mode === "source" && syncEnabledRef.current)
+      engine?.captureSourceZoom?.();
     if (value === "parallel" && mode !== "parallel") {
       enteringParallel.current =
         centerBlock(mode === "translation" ? "translation" : "source") ??

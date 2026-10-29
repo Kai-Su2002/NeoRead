@@ -341,3 +341,46 @@ it("keeps the original zoom basis when a sidebar toggle reverses mid-animation",
     vi.useRealTimers();
   }
 });
+
+it.each(["width", 1.37] as const)(
+  "restores source zoom %s after repeated parallel focus and panel resizes",
+  async (initial) => {
+    let width = 800;
+    Object.defineProperties(host, {
+      clientWidth: { get: () => width },
+      clientHeight: { value: 600 },
+    });
+    await adapter.setTheme({ ...defaultTheme, zoom: initial });
+    for (let i = 0; i < 20; i++) {
+      adapter.captureSourceZoom();
+      width = 400;
+      state.scale = 2; // automatic block focus replaces the resize basis
+      adapter.captureSourceZoom(); // a reversed transition must retain the snapshot
+      width = 800;
+      adapter.restoreSourceZoom();
+      expect(state.scaleValue).toBe(
+        initial === "width" ? "page-width" : "1.37",
+      );
+      expect(zoom).toHaveBeenLastCalledWith(initial, "focus");
+    }
+    zoom.mockClear();
+    adapter.restoreSourceZoom();
+    expect(zoom).not.toHaveBeenCalled();
+  },
+);
+
+it("adapts the saved numeric zoom to a changed source panel width", async () => {
+  let width = 800;
+  Object.defineProperties(host, {
+    clientWidth: { get: () => width },
+    clientHeight: { value: 600 },
+  });
+  await adapter.setTheme({ ...defaultTheme, zoom: 1.6 });
+  adapter.captureSourceZoom();
+  width = 400;
+  state.scale = 2;
+  width = 1000;
+  adapter.restoreSourceZoom();
+  expect(state.scale).toBe(2);
+  expect(zoom).toHaveBeenLastCalledWith(2, "focus");
+});

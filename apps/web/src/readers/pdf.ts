@@ -59,6 +59,7 @@ export class PDFReaderAdapter implements ReaderAdapter {
   private viewport: PDFViewport;
   private resizingViewport = false;
   private fitWidth = true;
+  private sourceZoom?: { width: number; scale: number; fitWidth: boolean };
   private appliedZoom?: ReaderTheme["zoom"];
   private wheelScale?: number;
   private wheelAppliedScale?: number;
@@ -640,6 +641,35 @@ export class PDFReaderAdapter implements ReaderAdapter {
       this.events.zoom?.(this.appliedZoom, "focus");
       this.viewport.reset();
     }
+  }
+  captureSourceZoom() {
+    // Keep the first snapshot through rapid reversals, including hidden panes.
+    if (this.sourceZoom || !this.container.clientWidth) return;
+    this.sourceZoom = {
+      width: this.container.clientWidth,
+      scale: this.viewer.currentScale,
+      fitWidth: this.fitWidth,
+    };
+  }
+  restoreSourceZoom() {
+    const saved = this.sourceZoom;
+    if (!saved || !this.container.clientWidth || this.disposed) return;
+    this.sourceZoom = undefined;
+    this.navigation.cancelMotion();
+    this.viewport.cancelAnimation();
+    this.fitWidth = saved.fitWidth;
+    this.wheelScale = undefined;
+    const zoom = saved.fitWidth
+      ? "width"
+      : Math.max(
+          0.1,
+          Math.min(5, (saved.scale * this.container.clientWidth) / saved.width),
+        );
+    this.appliedZoom = zoom;
+    this.viewer.currentScaleValue =
+      zoom === "width" ? "page-width" : String(zoom);
+    this.viewport.reset();
+    this.events.zoom?.(zoom, "focus");
   }
   cancelBlockFocus() {
     this.navigation.cancelMotion();

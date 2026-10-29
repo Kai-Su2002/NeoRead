@@ -552,6 +552,10 @@ export interface ReaderAdapter {
   focusReference?(location: DocumentLocation, text: string): Promise<boolean>;
   /** Briefly mark the source block after following a chat reference. */
   flashReference?(location: DocumentLocation, text: string): void;
+  /** Save single-pane PDF zoom before a synchronized mode transition. */
+  captureSourceZoom?(): void;
+  /** Restore that zoom after the single-pane geometry commits. */
+  restoreSourceZoom?(): void;
   cancelBlockFocus?(): void;
   destroy(): Promise<void>;
 }

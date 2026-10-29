@@ -90,6 +90,8 @@ const adapter = {
   getContext: vi.fn(async () => ""),
   destroy: vi.fn(async () => {}),
   focusBlock: vi.fn(async () => {}),
+  captureSourceZoom: vi.fn(),
+  restoreSourceZoom: vi.fn(),
   flashReference: vi.fn(),
   cancelBlockFocus: vi.fn(),
   followBlock: vi.fn(async () => {}),
@@ -1187,4 +1189,47 @@ it("strips legacy cross-side links when preparing a mark without losing its posi
     "p1-b1",
     "parallel",
   );
+});
+
+it("captures zoom before leaving source and restores it after source geometry commits", async () => {
+  vi.useFakeTimers();
+  try {
+    for (let i = 0; i < 3; i++) {
+      await click("原文译文");
+      expect(adapter.captureSourceZoom).toHaveBeenCalledTimes(i + 1);
+      await act(async () => vi.advanceTimersByTimeAsync(600));
+      await click("仅原文");
+      expect(adapter.restoreSourceZoom).toHaveBeenCalledTimes(i);
+      await act(async () => vi.advanceTimersByTimeAsync(600));
+      expect(adapter.restoreSourceZoom).toHaveBeenCalledTimes(i + 1);
+    }
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it("does not automatically focus or save zoom when switching with synchronization disabled", async () => {
+  await click("取消同步效果");
+  await act(async () =>
+    fixture.events!.readingAnchor?.({ blockId: "p1-b1", fraction: 0.5 }),
+  );
+  await click("原文译文");
+  expect(adapter.focusBlock).not.toHaveBeenCalled();
+  expect(adapter.captureSourceZoom).not.toHaveBeenCalled();
+});
+
+it("cancels a queued source restore when the mode reverses, including a translation detour", async () => {
+  vi.useFakeTimers();
+  try {
+    await click("原文译文");
+    await click("仅原文");
+    await click("原文译文");
+    await act(async () => vi.advanceTimersByTimeAsync(600));
+    expect(adapter.restoreSourceZoom).not.toHaveBeenCalled();
+    await click("仅译文");
+    await click("仅原文");
+    await act(async () => vi.advanceTimersByTimeAsync(600));
+    expect(adapter.restoreSourceZoom).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+  }
 });
