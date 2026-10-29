@@ -59,7 +59,12 @@ export class PDFReaderAdapter implements ReaderAdapter {
   private viewport: PDFViewport;
   private resizingViewport = false;
   private fitWidth = true;
-  private sourceZoom?: { width: number; scale: number; fitWidth: boolean };
+  private sourceZoom?: {
+    width: number;
+    scale: number;
+    fitWidth: boolean;
+    position: ReturnType<PDFViewport["position"]>;
+  };
   private appliedZoom?: ReaderTheme["zoom"];
   private wheelScale?: number;
   private wheelAppliedScale?: number;
@@ -649,14 +654,19 @@ export class PDFReaderAdapter implements ReaderAdapter {
       width: this.container.clientWidth,
       scale: this.viewer.currentScale,
       fitWidth: this.fitWidth,
+      position: this.viewport.position(true),
     };
   }
-  restoreSourceZoom() {
+  restoreSourceZoom(preserveCurrentCenter = false) {
     const saved = this.sourceZoom;
-    if (!saved || !this.container.clientWidth || this.disposed) return;
+    if (!saved || !this.container.clientWidth || this.disposed) return false;
+    const position = preserveCurrentCenter
+      ? this.viewport.position()
+      : saved.position;
     this.sourceZoom = undefined;
     this.navigation.cancelMotion();
     this.viewport.cancelAnimation();
+    this.navigation.resizeViewport();
     this.fitWidth = saved.fitWidth;
     this.wheelScale = undefined;
     const zoom = saved.fitWidth
@@ -668,8 +678,10 @@ export class PDFReaderAdapter implements ReaderAdapter {
     this.appliedZoom = zoom;
     this.viewer.currentScaleValue =
       zoom === "width" ? "page-width" : String(zoom);
-    this.viewport.reset();
+    const restored = position ? this.viewport.restorePosition(position) : false;
+    if (!restored) this.viewport.reset();
     this.events.zoom?.(zoom, "focus");
+    return restored;
   }
   cancelBlockFocus() {
     this.navigation.cancelMotion();

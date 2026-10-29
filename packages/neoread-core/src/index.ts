@@ -554,8 +554,9 @@ export interface ReaderAdapter {
   flashReference?(location: DocumentLocation, text: string): void;
   /** Save single-pane PDF zoom before a synchronized mode transition. */
   captureSourceZoom?(): void;
-  /** Restore that zoom after the single-pane geometry commits. */
-  restoreSourceZoom?(): void;
+  /** Restore zoom and center after single-pane layout commits; return true if positioned.
+   * After manual navigation, preserve the current reading center instead of the saved one. */
+  restoreSourceZoom?(preserveCurrentCenter?: boolean): boolean;
   cancelBlockFocus?(): void;
   destroy(): Promise<void>;
 }

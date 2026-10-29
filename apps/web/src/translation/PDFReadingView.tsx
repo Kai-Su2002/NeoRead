@@ -108,6 +108,7 @@ export function PDFReadingView({
     );
   };
   const previousMode = useRef<Mode>("source");
+  const sourcePositionChanged = useRef(false);
   const syncEnabledRef = useRef(syncEnabled);
   syncEnabledRef.current = syncEnabled;
   const enteringParallel = useRef<string | undefined>(undefined);
@@ -286,8 +287,12 @@ export function PDFReadingView({
       }
     });
   };
-  const focusBlock = (block: PDFBlock, origin: "source" | "translation") => {
-    input(origin);
+  const focusBlock = (
+    block: PDFBlock,
+    origin: "source" | "translation",
+    automatic = false,
+  ) => {
+    input(origin, automatic);
     const motion = explicitFocus.current;
     const operation = motion.operation;
     motion.moving = true;
@@ -588,6 +593,7 @@ export function PDFReadingView({
             focusBlock(
               block,
               previous === "translation" ? "translation" : "source",
+              true,
             );
           });
         });
@@ -604,8 +610,11 @@ export function PDFReadingView({
         frame = requestAnimationFrame(() => {
           if (cancelled) return;
           // Restore only after TranslationPanes has expanded the source panel.
-          engine.restoreSourceZoom?.();
-          if (reading.current && syncEnabledRef.current)
+          const positioned = engine.restoreSourceZoom?.(
+            sourcePositionChanged.current,
+          );
+          sourcePositionChanged.current = false;
+          if (!positioned && reading.current && syncEnabledRef.current)
             void engine.followBlock?.(reading.current).catch((e) => {
               if (!cancelled) toast.error(e.message);
             });
@@ -649,7 +658,8 @@ export function PDFReadingView({
       window.removeEventListener("pointercancel", release);
     };
   }, []);
-  const input = (active: typeof side.current) => {
+  const input = (active: typeof side.current, automatic = false) => {
+    if (mode !== "source" && !automatic) sourcePositionChanged.current = true;
     cancelTranslationMotion();
     if (explicitFocus.current.moving || active === "translation")
       engine?.cancelBlockFocus?.();
@@ -780,7 +790,7 @@ export function PDFReadingView({
         centerBlock(mode === "translation" ? "translation" : "source") ??
         reading.current?.blockId;
     }
-    input(value === "translation" ? "translation" : "source");
+    input(value === "translation" ? "translation" : "source", true);
     setPopup(undefined);
     setMode(value);
   };
@@ -790,7 +800,7 @@ export function PDFReadingView({
     syncEnabledRef.current = enabled;
     setSyncEnabled(enabled);
     // Stop pending follow animations before changing the synchronization policy.
-    input(side.current);
+    input(side.current, true);
     engine?.cancelBlockFocus?.();
     const anchor = reading.current;
     if (!enabled || mode !== "parallel" || !anchor) return;

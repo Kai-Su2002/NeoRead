@@ -1233,3 +1233,37 @@ it("cancels a queued source restore when the mode reverses, including a translat
     vi.useRealTimers();
   }
 });
+
+it("does not overwrite an exact source viewport restore with paragraph following", async () => {
+  vi.mocked(adapter.restoreSourceZoom!).mockReturnValueOnce(true);
+  await act(async () =>
+    fixture.events!.readingAnchor?.({ blockId: "p1-b1", fraction: 0.2 }),
+  );
+  await click("原文译文");
+  vi.mocked(adapter.followBlock!).mockClear();
+  vi.useFakeTimers();
+  try {
+    await click("仅原文");
+    await act(async () => vi.advanceTimersByTimeAsync(600));
+    expect(adapter.followBlock).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("preserves the new reading center after manual input in parallel mode", async () => {
+  await click("原文译文");
+  await act(async () =>
+    host
+      .querySelector(".translation-source")!
+      .dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 80 })),
+  );
+  vi.useFakeTimers();
+  try {
+    await click("仅原文");
+    await act(async () => vi.advanceTimersByTimeAsync(600));
+    expect(adapter.restoreSourceZoom).toHaveBeenCalledWith(true);
+  } finally {
+    vi.useRealTimers();
+  }
+});
