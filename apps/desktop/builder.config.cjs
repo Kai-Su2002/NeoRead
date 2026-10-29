@@ -5,6 +5,8 @@ module.exports = {
   files: ["dist/**/*", "package.json"],
   extraResources: [{ from: "staging", to: ".", filter: ["**/*"] }],
   asar: true,
+  // Electron UI translations only; document languages and fonts are unaffected.
+  electronLanguages: ["en", "zh-CN", "zh-TW"],
   // Keep maximum compression for Windows NSIS.
   compression: "maximum",
   npmRebuild: false,
