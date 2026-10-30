@@ -21,6 +21,7 @@ vi.mock("@neoread/api", () => ({
   },
 }));
 vi.mock("./shortcuts/shortcuts", () => ({
+  isMac: () => false,
   useShortcut: vi.fn(),
   loadBindings: vi.fn().mockResolvedValue(undefined),
 }));

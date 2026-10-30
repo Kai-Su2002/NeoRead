@@ -1,4 +1,4 @@
-import { useShortcut, loadBindings } from "./shortcuts/shortcuts";
+import { useShortcut, loadBindings, isMac } from "./shortcuts/shortcuts";
 import { useSaveReaderSettings } from "./neoread-settings";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -543,7 +543,7 @@ export function App() {
                   <Search className="size-3.5" />
                   快速查找
                 </span>
-                <kbd>⌘ K</kbd>
+                <kbd>{isMac() ? "⌘ K" : "Ctrl + K"}</kbd>
               </Button>
               {papers ? (
                 <PaperSidebar
