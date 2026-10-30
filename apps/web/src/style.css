@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../../../packages/ui/src/styles/shimmer.css";
 @source "../../../packages/ui/src";
 @custom-variant dark (&:is(.dark *));
 :root {
@@ -3936,40 +3937,6 @@ textarea.paper-note-input {
   padding: 3px;
   cursor: pointer;
 }
-/* Tool activity uses a quiet book icon; ordinary provider waits keep their glyph. */
-.chat-waiting {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 24px;
-  padding-bottom: 16px;
-  color: var(--muted-foreground);
-}
-.chat-waiting-icon {
-  display: inline-flex;
-  flex-shrink: 0;
-  animation: chat-waiting-spin 2.4s linear infinite;
-}
-.chat-waiting-icon--activity {
-  animation: none;
-}
-.chat-waiting .chat-status {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-@keyframes chat-waiting-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .chat-waiting-icon {
-    animation: none;
-  }
-}
-
 .annotation-quote-pair,
 .annotation-quote-pair > span {
   display: flex;
