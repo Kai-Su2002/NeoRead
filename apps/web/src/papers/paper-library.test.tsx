@@ -123,7 +123,10 @@ beforeEach(async () => {
   );
   useReaderStore.setState({
     documents: docs,
-    libraryPreferences: { mode: "papers", papers: { sort: "title" } },
+    libraryPreferences: {
+      mode: "papers",
+      papers: { sort: "title", layout: "card" },
+    },
   });
   usePaperUI.setState({
     view: "all",
@@ -2373,7 +2376,24 @@ it("opens picked papers together in document tabs and exits batch mode", async (
   expect(usePaperUI.getState().picking).toBe(false);
 });
 
-it("shows papers as cover cards and author lines that follow the setting", async () => {
+it("defaults to the table and honors saved card and author preferences", async () => {
+  await act(async () =>
+    useReaderStore.setState({
+      libraryPreferences: { mode: "papers", papers: { sort: "title" } },
+    }),
+  );
+  expect(host.querySelector(".paper-table")).not.toBeNull();
+  expect(
+    host.querySelector('[aria-label="表格"]')?.getAttribute("aria-selected"),
+  ).toBe("true");
+  await act(async () =>
+    useReaderStore.setState({
+      libraryPreferences: {
+        mode: "papers",
+        papers: { sort: "title", layout: "card" },
+      },
+    }),
+  );
   expect(host.querySelectorAll(".paper-card")).toHaveLength(2);
   const card = host.querySelector<HTMLElement>('[data-paper-id="a"]')!;
   expect(card.querySelector(".paper-card-cover img")).not.toBeNull();

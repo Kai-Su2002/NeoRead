@@ -262,7 +262,8 @@ export function PaperLibrary({
     };
   }, []);
   const tags = paperTags(documents);
-  const table = prefs.layout === "table" && view !== "duplicates";
+  const layout = prefs.layout ?? "table";
+  const table = layout === "table" && view !== "duplicates";
   const showAuthors = prefs.showAuthors !== false;
   const cardScale = prefs.cardScale || 1;
   const [listPane, setListPane] = useState<HTMLElement | null>(null);
@@ -839,7 +840,7 @@ export function PaperLibrary({
             </Select>
             {table && <PaperColumns controls={columnControls} />}
             <Tabs
-              value={prefs.layout === "table" ? "table" : "card"}
+              value={layout}
               onValueChange={(value) =>
                 void savePaperPreferences((p) => ({
                   ...p,
