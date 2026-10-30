@@ -97,6 +97,8 @@ contextBridge.exposeInMainWorld("neoreadDesktop", {
     return () => ipcRenderer.removeListener("neoread:citation-close", listener);
   },
   citePlugins: () => proxyRequest("neoread:cite-plugins"),
+  authorizeWordPluginAccess: () =>
+    proxyRequest("neoread:cite-plugin-authorize-word"),
   installCitePlugin: (kind: "word" | "wps") =>
     proxyRequest("neoread:cite-plugin-install", kind),
   uninstallCitePlugin: (kind: "word" | "wps") =>

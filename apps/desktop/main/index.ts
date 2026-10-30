@@ -52,6 +52,8 @@ import { commandLineStatus, setCommandLine } from "./command-line";
 import { createCitationWindow } from "./citation-window";
 import {
   citePluginStatus,
+  authorizeWordPluginAccess,
+  wordAccessFolder,
   installCitePlugin,
   uninstallCitePlugin,
   type CitePluginKind,
@@ -875,7 +877,7 @@ app
       requestFolderAccess: async (folder: string) => {
         const selected = await dialog.showOpenDialog(window!, {
           title: "允许访问 Word 插件文件夹",
-          message: "请选择当前文件夹，允许 NeoRead 安装或移除 Word 引用插件。",
+          message: "请选择当前文件夹，允许 NeoRead 访问 Word 引用插件。",
           buttonLabel: "允许访问",
           defaultPath: folder,
           properties: ["openDirectory"],
@@ -894,9 +896,94 @@ app
       )
         throw new Error("Invalid sender");
     };
-    ipcMain.handle("neoread:cite-plugins", (event) => {
+    let wordAccessDeniedFolder: string | null = null;
+    ipcMain.handle("neoread:cite-plugins", async (event) => {
       fromWindow(event);
-      return citePluginStatus(citeOptions());
+      wordAccessDeniedFolder = null;
+      const started = Date.now();
+      diagnostics?.logs.record("desktop", {
+        level: "info",
+        event: "cite_plugin.status_start",
+      });
+      try {
+        const plugins = await citePluginStatus(citeOptions());
+        diagnostics?.logs.record("desktop", {
+          level: "info",
+          event: "cite_plugin.status_finish",
+          durationMs: Date.now() - started,
+        });
+        return plugins;
+      } catch (error) {
+        const failure = error as NodeJS.ErrnoException & { killed?: boolean };
+        const code = failure?.code;
+        diagnostics?.logs.record("desktop", {
+          level: "error",
+          event: "cite_plugin.status_failed",
+          durationMs: Date.now() - started,
+          errorCode: [
+            "EPERM",
+            "EACCES",
+            "ENOENT",
+            "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+          ].includes(code || "")
+            ? code
+            : failure?.killed
+              ? "timeout"
+              : "status",
+        });
+        wordAccessDeniedFolder = wordAccessFolder(error, citeOptions());
+        if (wordAccessDeniedFolder)
+          throw new Error(
+            "WORD_ACCESS_REQUIRED:访问被拒绝，请授权访问 Word 插件目录。",
+          );
+        if (code === "EACCES" || code === "EPERM")
+          throw new Error(
+            "访问被拒绝，请检查 Word 或 WPS 配置目录的访问权限。",
+          );
+        if (code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER")
+          throw new Error("Word 配置信息过多，无法完成检测。请导出诊断包。");
+        if (failure?.killed)
+          throw new Error("检测超时，请重试；如果持续失败，请导出诊断包。");
+        if (
+          error instanceof Error &&
+          error.message.startsWith("Word 启动目录配置无效")
+        )
+          throw error;
+        throw new Error(
+          "无法读取插件状态，请重试；如果持续失败，请导出诊断包。",
+        );
+      }
+    });
+    ipcMain.handle("neoread:cite-plugin-authorize-word", async (event) => {
+      fromWindow(event);
+      if (!wordAccessDeniedFolder)
+        throw new Error("请先重新检测 Word 插件状态。");
+      const started = Date.now();
+      diagnostics?.logs.record("desktop", {
+        level: "info",
+        event: "cite_plugin.authorize_start",
+      });
+      try {
+        await authorizeWordPluginAccess(wordAccessDeniedFolder, citeOptions());
+        diagnostics?.logs.record("desktop", {
+          level: "info",
+          event: "cite_plugin.authorize_finish",
+          durationMs: Date.now() - started,
+        });
+      } catch (error) {
+        const cancelled =
+          error instanceof Error &&
+          error.message === "已取消 Word 插件文件夹授权";
+        diagnostics?.logs.record("desktop", {
+          level: cancelled ? "info" : "error",
+          event: cancelled
+            ? "cite_plugin.authorize_cancelled"
+            : "cite_plugin.authorize_failed",
+          durationMs: Date.now() - started,
+          ...(cancelled ? {} : { errorCode: "authorization" }),
+        });
+        throw error;
+      }
     });
     ipcMain.handle("neoread:cite-plugin-install", async (event, kind) => {
       fromWindow(event);

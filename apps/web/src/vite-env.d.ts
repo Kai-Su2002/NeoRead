@@ -66,6 +66,7 @@ interface Window {
     setCitationSize?: (width: number, height: number) => Promise<void>;
     onCitationClose?: (callback: () => void) => () => void;
     citePlugins?: () => Promise<import("./cite/plugins").CitePluginStatus[]>;
+    authorizeWordPluginAccess?: () => Promise<void>;
     installCitePlugin?: (
       kind: "word" | "wps",
     ) => Promise<import("./cite/plugins").CitePluginStatus[]>;

@@ -21,6 +21,7 @@ let stop: ReturnType<typeof vi.fn>;
 let serverSpawn: ReturnType<typeof vi.fn>;
 let libraryDirectory: ReturnType<typeof vi.fn>;
 let legacyMigrate: ReturnType<typeof vi.fn>;
+let diagnosticLog: ReturnType<typeof vi.fn>;
 let diagnostics: {
   record: ReturnType<typeof vi.fn>;
   failure: ReturnType<typeof vi.fn>;
@@ -128,6 +129,8 @@ beforeEach(async ({ task }) => {
   }));
   vi.doMock("./cite-plugins", () => ({
     citePluginStatus: vi.fn(async () => []),
+    wordAccessFolder: vi.fn(() => null as string | null),
+    authorizeWordPluginAccess: vi.fn(async () => {}),
     installCitePlugin: vi.fn(),
     uninstallCitePlugin: vi.fn(),
   }));
@@ -187,10 +190,11 @@ beforeEach(async ({ task }) => {
     record: vi.fn(),
     failure: vi.fn().mockResolvedValue(undefined),
   };
+  diagnosticLog = vi.fn();
   vi.doMock("./diagnostic-service", () => ({
     startDiagnosticService: () => ({
       directory: "/logs",
-      logs: { secrets: [], sessionId: "test", record: vi.fn() },
+      logs: { secrets: [], sessionId: "test", record: diagnosticLog },
       ...diagnostics,
       finishMigration() {},
       setSettings() {},
@@ -218,6 +222,69 @@ beforeEach(async ({ task }) => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+it.each([
+  [
+    { code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER", killed: true },
+    "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+  ],
+  [{ killed: true }, "timeout"],
+  [{ code: "EACCES" }, "EACCES"],
+  [{ code: "private-dynamic-value" }, "status"],
+])(
+  "reports plugin detection failures safely and allows a later query",
+  async (details, errorCode) => {
+    const { citePluginStatus } = await import("./cite-plugins");
+    const failure = Object.assign(
+      new Error("private registry contents"),
+      details,
+    );
+    vi.mocked(citePluginStatus).mockRejectedValueOnce(failure);
+    const query = handlers.get("neoread:cite-plugins")!;
+    await expect(query(event())).rejects.toThrow(
+      errorCode === "EACCES"
+        ? "访问被拒绝"
+        : errorCode === "timeout"
+          ? "检测超时"
+          : errorCode === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
+            ? "配置信息过多"
+            : "无法读取插件状态",
+    );
+    expect(diagnosticLog).toHaveBeenCalledWith("desktop", {
+      level: "error",
+      event: "cite_plugin.status_failed",
+      durationMs: expect.any(Number),
+      errorCode,
+    });
+    expect(JSON.stringify(diagnosticLog.mock.calls)).not.toContain("private");
+    await expect(query(event())).resolves.toEqual([]);
+    expect(diagnosticLog).toHaveBeenCalledWith("desktop", {
+      level: "info",
+      event: "cite_plugin.status_finish",
+      durationMs: expect.any(Number),
+    });
+  },
+);
+
+it("only authorizes a Word folder after a denied status check", async () => {
+  const { citePluginStatus, wordAccessFolder, authorizeWordPluginAccess } =
+    await import("./cite-plugins");
+  const query = handlers.get("neoread:cite-plugins")!;
+  const authorize = handlers.get("neoread:cite-plugin-authorize-word")!;
+  await expect(authorize(event())).rejects.toThrow("请先重新检测");
+  vi.mocked(wordAccessFolder).mockReturnValueOnce("/word-folder");
+  vi.mocked(citePluginStatus).mockRejectedValueOnce(
+    Object.assign(new Error("denied"), { code: "EACCES" }),
+  );
+  await expect(query(event())).rejects.toThrow("WORD_ACCESS_REQUIRED:");
+  await authorize(event());
+  expect(authorizeWordPluginAccess).toHaveBeenCalledWith(
+    "/word-folder",
+    expect.any(Object),
+  );
+  await query(event());
+  await expect(authorize(event())).rejects.toThrow("请先重新检测");
 });
 
 it("waits for flushed reading data, then copies once despite repeated quit events", async () => {
