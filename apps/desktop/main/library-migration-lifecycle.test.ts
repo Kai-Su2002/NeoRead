@@ -14,6 +14,9 @@ let window: EventEmitter & {
     mainFrame: { url: string };
   };
 };
+let auxiliaryWindowOpen = false;
+let quittingWindows = false;
+let citationStop: ReturnType<typeof vi.fn>;
 let ipc: EventEmitter;
 let handlers: Map<string, (...args: any[]) => any>;
 let migrate: ReturnType<typeof vi.fn>;
@@ -49,10 +52,18 @@ beforeEach(async ({ task }) => {
   vi.doMock("./library-recovery-server", () => ({
     startLibraryRecoveryServer: recoveryStart,
   }));
+  auxiliaryWindowOpen = false;
+  quittingWindows = false;
+  citationStop = vi.fn();
+  vi.doMock("./citation-service", () => ({
+    startCitationService: vi.fn(() => ({ stop: citationStop })),
+  }));
   handlers = new Map();
   ipc = Object.assign(new EventEmitter(), {
-    handle: (name: string, fn: (...args: any[]) => any) =>
-      handlers.set(name, fn),
+    handle: (name: string, fn: (...args: any[]) => any) => {
+      if (handlers.has(name)) throw new Error("Duplicate IPC handler");
+      handlers.set(name, fn);
+    },
   });
   app = Object.assign(new EventEmitter(), {
     isPackaged: true,
@@ -62,7 +73,17 @@ beforeEach(async ({ task }) => {
     setAsDefaultProtocolClient: vi.fn(),
     relaunch: vi.fn(),
     quit: () => {
-      app.emit("before-quit", { preventDefault() {} });
+      let prevented = false;
+      app.emit("before-quit", {
+        preventDefault() {
+          prevented = true;
+        },
+      });
+      if (!prevented) {
+        quittingWindows = true;
+        window?.close();
+        quittingWindows = false;
+      }
     },
   });
   showOpenDialog = vi
@@ -71,6 +92,7 @@ beforeEach(async ({ task }) => {
   showMessageBox = vi.fn().mockResolvedValue({ response: 0 });
   vi.doMock("electron", () => ({
     app,
+    autoUpdater: new EventEmitter(),
     ipcMain: ipc,
     dialog: { showOpenDialog, showMessageBox, showErrorBox: vi.fn() },
     session: {
@@ -98,7 +120,11 @@ beforeEach(async ({ task }) => {
       async loadURL(url: string) {
         loadURL(url);
       }
+      show = vi.fn();
+      focus = vi.fn();
+      isMinimized = () => false;
       close() {
+        if (this.destroyed) return;
         let prevented = false;
         this.emit("close", {
           preventDefault() {
@@ -107,7 +133,9 @@ beforeEach(async ({ task }) => {
         });
         if (!prevented) {
           this.destroyed = true;
-          app.emit("window-all-closed");
+          this.emit("closed");
+          if (!auxiliaryWindowOpen && !quittingWindows)
+            app.emit("window-all-closed");
         }
       }
     },
@@ -119,9 +147,11 @@ beforeEach(async ({ task }) => {
       stderr: new PassThrough(),
       kill: vi.fn(),
     });
-    queueMicrotask(() =>
-      child.stdout.write('{"url":"http://127.0.0.1:1234"}\n'),
-    );
+    queueMicrotask(() => {
+      if (task.name.includes("server exits before readiness"))
+        child.emit("exit", 1);
+      else child.stdout.write('{"url":"http://127.0.0.1:1234"}\n');
+    });
     return child;
   });
   vi.doMock("./citation-window", () => ({
@@ -209,12 +239,23 @@ beforeEach(async ({ task }) => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({})));
   vi.stubGlobal(
     "process",
-    Object.assign(Object.create(process), {
-      resourcesPath: "/resources",
-      on: vi.fn(),
-    }),
+    Object.assign(
+      Object.create(process, {
+        platform: {
+          value: task.name.startsWith("macOS:") ? "darwin" : "win32",
+        },
+      }),
+      {
+        resourcesPath: "/resources",
+        on: vi.fn(),
+      },
+    ),
   );
   await import("./index");
+  if (task.name.includes("server exits before readiness")) {
+    await vi.waitFor(() => expect(diagnostics.failure).toHaveBeenCalledOnce());
+    return;
+  }
   await vi.waitFor(() =>
     expect(handlers.has("neoread:check-updates")).toBe(true),
   );
@@ -352,9 +393,7 @@ it("reopens the old library after shutdown or copy fails", async () => {
       detail: expect.stringContaining("原书库已保留"),
     }),
   );
-  expect(handlers.get("neoread:library-location")!(event())).toBe(
-    "/old/library",
-  );
+  expect(saveLocation).not.toHaveBeenCalled();
   expect(app.relaunch).toHaveBeenCalledOnce();
 });
 
@@ -409,6 +448,7 @@ it("offers diagnostic export when legacy migration fails before opening the libr
 
 it("waits for Reader migration before choosing or opening the library", async () => {
   vi.resetModules();
+  handlers.clear();
   serverSpawn.mockClear();
   libraryDirectory.mockClear();
   legacyMigrate.mockClear();
@@ -544,3 +584,123 @@ it.each(["cancelled", "completed"])(
     );
   },
 );
+
+it("does not create an idle citation renderer at startup", async () => {
+  const { createCitationWindow } = await import("./citation-window");
+  expect(createCitationWindow).not.toHaveBeenCalled();
+});
+
+it("exits after saving the main window even with an auxiliary window open", async () => {
+  auxiliaryWindowOpen = true;
+  const quit = vi.spyOn(app, "quit");
+  window.close();
+  expect(quit).not.toHaveBeenCalled();
+  ipc.emit("neoread:flushed", event(), null);
+  await vi.waitFor(() => expect(quit).toHaveBeenCalled());
+  expect(serverSpawn.mock.results[0].value.kill).toHaveBeenCalled();
+});
+
+it("macOS: destroys the main window, keeps services and recreates once on activation", async () => {
+  const original = window;
+  window.close();
+  ipc.emit("neoread:flushed", event(), null);
+  expect(serverSpawn.mock.results[0].value.kill).not.toHaveBeenCalled();
+  expect(citationStop).not.toHaveBeenCalled();
+  app.emit("activate");
+  app.emit("activate");
+  await vi.waitFor(() => expect(window).not.toBe(original));
+  expect(loadURL).toHaveBeenCalledTimes(2);
+  // IPC is registered once; the new renderer still saves before explicit quit.
+  app.quit();
+  expect(window.webContents.send).toHaveBeenCalledWith("neoread:flush");
+  expect(serverSpawn.mock.results[0].value.kill).not.toHaveBeenCalled();
+  ipc.emit("neoread:flushed", event(), null);
+  expect(serverSpawn.mock.results[0].value.kill).toHaveBeenCalledOnce();
+  expect(citationStop).toHaveBeenCalledOnce();
+});
+
+it("macOS: reopens through second-instance and can cancel an explicit quit on save failure", async () => {
+  const original = window;
+  window.close();
+  ipc.emit("neoread:flushed", event(), null);
+  app.emit("second-instance", {}, []);
+  await vi.waitFor(() => expect(window).not.toBe(original));
+  app.quit();
+  ipc.emit("neoread:flushed", event(), "save failed");
+  await vi.waitFor(() => expect(showMessageBox).toHaveBeenCalled());
+  expect(serverSpawn.mock.results[0].value.kill).not.toHaveBeenCalled();
+  window.close();
+  ipc.emit("neoread:flushed", event(), null);
+  expect(serverSpawn.mock.results[0].value.kill).not.toHaveBeenCalled();
+});
+
+it("macOS: explicit quit without a main window stops the citation listener and server", async () => {
+  window.close();
+  ipc.emit("neoread:flushed", event(), null);
+  app.quit();
+  expect(citationStop).toHaveBeenCalledOnce();
+  expect(serverSpawn.mock.results[0].value.kill).toHaveBeenCalledOnce();
+});
+
+it.each([false, true])(
+  "macOS: server failure prompts then quits (main window closed: %s)",
+  async (closeMain) => {
+    if (closeMain) {
+      window.close();
+      ipc.emit("neoread:flushed", event(), null);
+    }
+    const original = window;
+    let dismiss!: () => void;
+    diagnostics.failure.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          dismiss = resolve;
+        }),
+    );
+    const quit = vi.spyOn(app, "quit");
+    const child = serverSpawn.mock.results[0].value;
+    child.emit("exit", 1);
+    expect(diagnostics.failure).toHaveBeenCalledWith(
+      "NeoRead 本地服务已停止",
+      expect.any(String),
+    );
+    expect(citationStop).toHaveBeenCalledOnce();
+    expect(quit).not.toHaveBeenCalled();
+    app.emit("activate");
+    app.emit("second-instance", {}, []);
+    await Promise.resolve();
+    expect(window).toBe(original);
+    expect(loadURL).toHaveBeenCalledOnce();
+    dismiss();
+    await vi.waitFor(() => expect(quit).toHaveBeenCalledOnce());
+    expect(child.kill).toHaveBeenCalledOnce();
+    expect(citationStop).toHaveBeenCalledOnce();
+  },
+);
+
+it("server exits before readiness: reports only the startup failure", () => {
+  expect(diagnostics.failure).toHaveBeenCalledWith(
+    "无法打开 NeoRead",
+    expect.any(String),
+  );
+  expect(diagnostics.failure).toHaveBeenCalledOnce();
+  expect(serverSpawn.mock.results[0].value.kill).toHaveBeenCalledOnce();
+});
+
+it("macOS: normal shutdown does not report a server failure", () => {
+  app.quit();
+  ipc.emit("neoread:flushed", event(), null);
+  serverSpawn.mock.results[0].value.emit("exit", 0);
+  expect(diagnostics.failure).not.toHaveBeenCalled();
+});
+
+it("macOS: updating follows the explicit quit path even before app before-quit", async () => {
+  const { autoUpdater } = await import("electron");
+  autoUpdater.emit("before-quit-for-update");
+  auxiliaryWindowOpen = true;
+  window.close();
+  expect(serverSpawn.mock.results[0].value.kill).not.toHaveBeenCalled();
+  ipc.emit("neoread:flushed", event(), null);
+  expect(citationStop).toHaveBeenCalledOnce();
+  expect(serverSpawn.mock.results[0].value.kill).toHaveBeenCalledOnce();
+});

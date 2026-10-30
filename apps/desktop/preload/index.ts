@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { CiteEvent } from "../../../packages/api-client/src/cite-events";
 import type { ProxySettings } from "../../../packages/neoread-core/src/proxy-settings";
 import type { UpdateProgress } from "../../../packages/neoread-core/src/update-progress";
 async function proxyRequest(channel: string, ...args: unknown[]) {
@@ -91,11 +92,14 @@ contextBridge.exposeInMainWorld("neoreadDesktop", {
     ipcRenderer.invoke("neoread:citation-visible", visible),
   setCitationSize: (width: number, height: number) =>
     ipcRenderer.invoke("neoread:citation-size", width, height),
-  onCitationClose: (callback: () => void) => {
-    const listener = () => callback();
-    ipcRenderer.on("neoread:citation-close", listener);
-    return () => ipcRenderer.removeListener("neoread:citation-close", listener);
+  onCitationEvent: (callback: (event: CiteEvent) => void) => {
+    const listener = (_event: unknown, value: CiteEvent) => callback(value);
+    ipcRenderer.on("neoread:citation-event", listener);
+    ipcRenderer.send("neoread:citation-ready");
+    return () => ipcRenderer.removeListener("neoread:citation-event", listener);
   },
+  completeCitation: (transaction: string, error: string) =>
+    ipcRenderer.invoke("neoread:citation-complete", transaction, error),
   citePlugins: () => proxyRequest("neoread:cite-plugins"),
   authorizeWordPluginAccess: () =>
     proxyRequest("neoread:cite-plugin-authorize-word"),

@@ -64,7 +64,10 @@ interface Window {
     focusWindow?: () => Promise<void>;
     setCitationVisible?: (visible: boolean) => Promise<void>;
     setCitationSize?: (width: number, height: number) => Promise<void>;
-    onCitationClose?: (callback: () => void) => () => void;
+    onCitationEvent?: (
+      callback: (event: import("@neoread/api").CiteEvent) => void,
+    ) => () => void;
+    completeCitation?: (transaction: string, error: string) => Promise<void>;
     citePlugins?: () => Promise<import("./cite/plugins").CitePluginStatus[]>;
     authorizeWordPluginAccess?: () => Promise<void>;
     installCitePlugin?: (
