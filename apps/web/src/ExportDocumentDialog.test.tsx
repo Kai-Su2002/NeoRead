@@ -7,6 +7,7 @@ import { api } from "@neoread/api";
 import { downloadBlob, downloadText } from "./download";
 import { copyText } from "./chat/clipboard";
 import { exportAnnotatedPDFWithToast } from "./annotated-pdf-export";
+import { exportTranslatedPDF } from "./translated-pdf-export";
 import { ExportDocumentDialog } from "./ExportDocumentDialog";
 import { paper } from "./papers/fixtures";
 
@@ -26,6 +27,7 @@ vi.mock("./chat/clipboard", () => ({ copyText: vi.fn(async () => true) }));
 vi.mock("./annotated-pdf-export", () => ({
   exportAnnotatedPDFWithToast: vi.fn(async () => {}),
 }));
+vi.mock("./translated-pdf-export", () => ({ exportTranslatedPDF: vi.fn() }));
 
 let root: Root, host: HTMLDivElement;
 const close = vi.fn();
@@ -78,6 +80,7 @@ beforeEach(() => {
     clear: () => storage.clear(),
   });
   vi.clearAllMocks();
+  vi.mocked(exportTranslatedPDF).mockReset();
   localStorage.clear();
   vi.mocked(api.documentNote).mockResolvedValue({
     body: "论文笔记正文",
@@ -95,6 +98,62 @@ beforeEach(() => {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
+});
+
+it("exports translated PDF independently of Markdown selections and reports preserved areas", async () => {
+  localStorage.setItem("neoread.notes-export", JSON.stringify(["notes"]));
+  vi.mocked(exportTranslatedPDF).mockResolvedValue({
+    pages: 3,
+    translated: 8,
+    issues: [{ page: 2, blockId: "b", reason: "overflow" }],
+  });
+  await mount();
+  await act(async () => button("导出译文 PDF").click());
+  expect(exportTranslatedPDF).toHaveBeenCalledWith(
+    doc,
+    expect.any(AbortSignal),
+    expect.any(Function),
+  );
+  expect(document.body.textContent).toContain("写入 8 个译文段落");
+  expect(document.body.textContent).toContain(
+    "第 2 页：译文无法在原区域内排下",
+  );
+  expect(api.exportTranslation).not.toHaveBeenCalled();
+  expect(exportAnnotatedPDFWithToast).not.toHaveBeenCalled();
+  expect(close).not.toHaveBeenCalled();
+});
+
+it("aborts translated PDF export when the dialog is closed", async () => {
+  let finish!: (
+    result: Awaited<ReturnType<typeof exportTranslatedPDF>>,
+  ) => void;
+  vi.mocked(exportTranslatedPDF).mockImplementation(
+    (_doc, _signal, progress) => {
+      progress({ phase: "pages", done: 1, total: 4 });
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    },
+  );
+  await mount();
+  await act(async () => button("导出译文 PDF").click());
+  const signal = vi.mocked(exportTranslatedPDF).mock.calls[0][1];
+  expect(document.querySelector("progress")?.value).toBe(1);
+  expect(button("导出译文 PDF").disabled).toBe(true);
+  await act(async () => button("取消").click());
+  expect(signal.aborted).toBe(true);
+  expect(close).toHaveBeenCalledOnce();
+  await act(async () => finish({ pages: 4, translated: 10, issues: [] }));
+  expect(document.body.textContent).not.toContain("写入 10 个译文段落");
+});
+
+it("keeps PDF export errors visible and allows a retry", async () => {
+  vi.mocked(exportTranslatedPDF).mockRejectedValue(new Error("字体加载失败"));
+  await mount();
+  await act(async () => button("导出译文 PDF").click());
+  expect(document.body.textContent).toContain("字体加载失败");
+  expect(button("导出译文 PDF").disabled).toBe(false);
+  expect(close).not.toHaveBeenCalled();
 });
 afterEach(async () => {
   await act(async () => root.unmount());

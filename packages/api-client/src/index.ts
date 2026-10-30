@@ -395,9 +395,10 @@ export const api = {
     request<import("@neoread/core").EPUBReadingBlock[]>(
       `/api/documents/${id}/epub-blocks`,
     ),
-  translations: (id: string) =>
+  translations: (id: string, signal?: AbortSignal) =>
     request<import("@neoread/core").TranslationBlock[]>(
       `/api/documents/${id}/translations`,
+      { signal },
     ),
   exportTranslation: async (
     id: string,
@@ -494,7 +495,8 @@ export const api = {
     ),
   process: (id: string) =>
     request<Processing>(`/api/documents/${id}/processing`, { method: "POST" }),
-  blocks: (id: string) => request<PDFBlock[]>(`/api/documents/${id}/blocks`),
+  blocks: (id: string, signal?: AbortSignal) =>
+    request<PDFBlock[]>(`/api/documents/${id}/blocks`, { signal }),
   aiConfig: () => request<AIConfig>("/api/ai/config"),
   agentModels: (provider: string, signal?: AbortSignal) =>
     request<AgentModel[]>(

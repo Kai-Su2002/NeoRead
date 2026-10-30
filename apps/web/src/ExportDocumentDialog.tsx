@@ -21,6 +21,12 @@ import {
 } from "./notes-export";
 import { downloadBlob, downloadText, fileTitle } from "./download";
 import { exportAnnotatedPDFWithToast } from "./annotated-pdf-export";
+import { exportTranslatedPDF } from "./translated-pdf-export";
+import {
+  exportReasons,
+  type PDFExportProgress,
+  type TranslatedPDF,
+} from "./translation/pdf-export-model";
 
 type DocumentExportPart = "translation" | ExportPart;
 const labels = { translation: "译文", ...exportParts };
@@ -61,7 +67,16 @@ export function ExportDocumentDialog({
   });
   const [refresh, setRefresh] = useState(0);
   const [images, setImages] = useState(false);
-  const [busy, setBusy] = useState<"copy" | "download" | "pdf" | null>(null);
+  const [busy, setBusy] = useState<
+    "copy" | "download" | "pdf" | "translation-pdf" | null
+  >(null);
+  const [pdfProgress, setPDFProgress] = useState<PDFExportProgress | null>(
+    null,
+  );
+  const [pdfResult, setPDFResult] = useState<Omit<
+    TranslatedPDF,
+    "bytes"
+  > | null>(null);
   const [error, setError] = useState("");
   const request = useRef<AbortController | null>(null);
   useEffect(() => () => request.current?.abort(), [doc.id]);
@@ -178,6 +193,35 @@ export function ExportDocumentDialog({
       }
     }
   };
+  const saveTranslatedPDF = async () => {
+    if (busy || request.current || !translationCount) return;
+    const controller = new AbortController();
+    request.current = controller;
+    setBusy("translation-pdf");
+    setError("");
+    setPDFResult(null);
+    try {
+      const result = await exportTranslatedPDF(
+        doc,
+        controller.signal,
+        (progress) => {
+          if (!controller.signal.aborted) setPDFProgress(progress);
+        },
+      );
+      if (!controller.signal.aborted) setPDFResult(result);
+    } catch (error) {
+      if (!controller.signal.aborted)
+        setError(
+          error instanceof Error ? error.message : "译文 PDF 导出失败，请重试",
+        );
+    } finally {
+      if (request.current === controller) {
+        request.current = null;
+        setBusy(null);
+        setPDFProgress(null);
+      }
+    }
+  };
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-sm">
@@ -269,6 +313,66 @@ export function ExportDocumentDialog({
             {busy === "download" ? "正在导出…" : "导出"}
           </Button>
         </div>
+        {doc.type === "pdf" && (
+          <div className="space-y-3 border-t pt-4">
+            <div className="flex items-center gap-3">
+              <p className="flex-1 text-xs leading-5 text-muted-foreground">
+                按原版面导出已保存的译文。图表、公式和无法排入的段落保留原文。
+              </p>
+              <Button
+                variant="outline"
+                disabled={!!busy || !translationCount}
+                onClick={() => void saveTranslatedPDF()}
+              >
+                {busy === "translation-pdf" ? (
+                  <LoaderCircle className="animate-spin motion-reduce:animate-none" />
+                ) : (
+                  <FileDown />
+                )}
+                导出译文 PDF
+              </Button>
+            </div>
+            {pdfProgress && (
+              <div className="space-y-1">
+                <p role="status" className="text-xs text-muted-foreground">
+                  {pdfProgress.phase === "preparing"
+                    ? "正在准备译文与字体…"
+                    : pdfProgress.phase === "saving"
+                      ? "正在生成 PDF…"
+                      : `正在排版 ${pdfProgress.done + 1} / ${pdfProgress.total} 页`}
+                </p>
+                <progress
+                  aria-label="译文 PDF 导出进度"
+                  className="w-full"
+                  max={pdfProgress.total || 1}
+                  value={pdfProgress.total ? pdfProgress.done : undefined}
+                />
+              </div>
+            )}
+            {pdfResult && (
+              <div className="space-y-1 text-xs leading-5 text-muted-foreground">
+                <p role="status">
+                  已生成 {pdfResult.pages} 页 PDF，写入 {pdfResult.translated}{" "}
+                  个译文段落。
+                </p>
+                {pdfResult.issues.length > 0 && (
+                  <details>
+                    <summary className="cursor-pointer">
+                      查看保留原文的区域（{pdfResult.issues.length}）
+                    </summary>
+                    <ul className="mt-1 max-h-32 list-inside list-disc overflow-y-auto">
+                      {pdfResult.issues.map((issue, i) => (
+                        <li key={i}>
+                          第 {issue.page} 页：{exportReasons[issue.reason]}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {doc.type === "pdf" && (
           <div className="flex items-center gap-3 border-t pt-4">
             <p className="flex-1 text-xs leading-5 text-muted-foreground">
