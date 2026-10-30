@@ -56,7 +56,7 @@ interface Window {
       ids: string[],
       library: "books" | "papers",
       folder?: string,
-    ) => Promise<void>;
+    ) => Promise<string[]>;
     showDocumentFile: (id: string, type: "pdf" | "epub") => Promise<void>;
     openDocumentFile: (id: string, type: "pdf" | "epub") => Promise<void>;
     openExternal: (url: string) => Promise<void>;
@@ -74,6 +74,13 @@ interface Window {
     ) => Promise<import("./cite/plugins").CitePluginStatus[]>;
     onOpenLink?: (
       callback: (target: import("@neoread/core").NeoReadLinkTarget) => void,
+    ) => () => void;
+    /** Documents chosen with the system Open With menu, already imported. */
+    onOpenFiles?: (
+      callback: (opened: {
+        documents: string[];
+        large: Array<{ id: string; name: string; pages: number }>;
+      }) => void,
     ) => () => void;
     onBeforeClose: (callback: () => Promise<void>) => () => void;
     setDocumentTabActive?: (active: boolean) => Promise<void>;

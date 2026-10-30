@@ -50,6 +50,7 @@ import {
   updateLibraryPreferences,
   refreshTrash,
   openLinkTarget,
+  openWhenParsed,
   openLibraryDocument,
   documentTabsShown,
 } from "./store";
@@ -140,6 +141,8 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [largePapers, setLargePapers] = useState<LargePaper[]>([]);
   const [largePaperFolder, setLargePaperFolder] = useState("");
+  // Long PDFs from Open With open once the reader chooses their library.
+  const openLargeAfterImport = useRef(false);
   const [loading, setLoading] = useState(true);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [error, setError] = useState("");
@@ -243,12 +246,15 @@ export function App() {
     try {
       if (library === "books") switchMode("books");
       const desktop = papers.flatMap((p) => (p.id ? [p.id] : []));
-      if (desktop.length)
-        await window.neoreadDesktop?.importLargePapers(
-          desktop,
-          library,
-          library === "papers" ? largePaperFolder : "",
-        );
+      const imported = desktop.length
+        ? await window.neoreadDesktop?.importLargePapers(
+            desktop,
+            library,
+            library === "papers" ? largePaperFolder : "",
+          )
+        : [];
+      if (openLargeAfterImport.current && imported?.[0])
+        void openOpened(imported[0]);
       for (const paper of papers)
         if (paper.file)
           await api.import(
@@ -264,11 +270,30 @@ export function App() {
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
+      openLargeAfterImport.current = false;
       setLargePapers([]);
       setLargePaperFolder("");
       setBusy(false);
     }
   };
+  const openOpened = (id: string) =>
+    openWhenParsed(id, () => toast.info("论文解析中，完成后自动打开"))
+      .then((found) => {
+        if (!found) toast.error("找不到这份文档，它可能已被删除或在回收站中");
+      })
+      .catch((e) => toast.error((e as Error).message));
+  useEffect(() => {
+    if (loading) return;
+    return window.neoreadDesktop?.onOpenFiles?.(({ documents, large }) => {
+      if (large.length) {
+        // Long PDFs need the same confirmation as files imported in the app.
+        openLargeAfterImport.current = !documents.length;
+        setLargePapers(large);
+        setLargePaperFolder("");
+      }
+      if (documents[0]) void openOpened(documents[0]);
+    });
+  }, [loading]);
   useEffect(() => {
     if (loading) return;
     return window.neoreadDesktop?.onOpenLink?.((target) => {
@@ -1009,7 +1034,10 @@ export function App() {
           papers={largePapers}
           busy={busy}
           onChoose={(library) => void importLargePapers(library)}
-          onCancel={() => setLargePapers([])}
+          onCancel={() => {
+            openLargeAfterImport.current = false;
+            setLargePapers([]);
+          }}
         />
         {!window.neoreadDesktop?.setCitationVisible && <CiteHost />}
         <Toaster

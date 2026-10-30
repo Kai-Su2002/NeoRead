@@ -38,6 +38,7 @@ import {
 } from "./proxy-settings";
 import { startUpdateService } from "./update-service";
 import { devIsolation } from "./dev-isolation";
+import { documentArguments, documentFile } from "./open-files";
 import {
   migrateReaderData,
   ReaderMigrationError,
@@ -244,8 +245,9 @@ async function importPaths(
   allowLarge = false,
   folder = "",
 ) {
-  const accepted = library === "papers" ? /\.pdf$/i : /\.(epub|pdf)$/i;
+  const accepted = library === "papers" ? /\.pdf$/i : documentFile;
   const large: Array<{ id: string; name: string; pages: number }> = [];
+  const documents: string[] = [];
   for (const path of paths) {
     if (!accepted.test(path)) continue;
     const data = await readFile(path);
@@ -272,10 +274,10 @@ async function importPaths(
       const id = randomBytes(16).toString("hex");
       largePapers.set(id, path);
       large.push({ id, name, pages: failure.pages });
-    }
+    } else documents.push((await response.json()).id);
   }
   window?.webContents.send("neoread:library-changed");
-  return large;
+  return { large, documents };
 }
 // neoread:// links reach one window. The renderer claims queued links once its
 // listener exists; later links are sent directly.
@@ -300,27 +302,86 @@ app.on("open-url", (event, link) => {
   event.preventDefault();
   openLink(link);
 });
-app.on("second-instance", (_event, argv) => {
+app.on("second-instance", (_event, argv, workingDirectory) => {
   const link = linkArgument(argv);
+  const files =
+    process.platform === "darwin"
+      ? []
+      : documentArguments(argv, workingDirectory, !!process.defaultApp);
   if (link) openLink(link);
-  else if (window && !window.isDestroyed()) {
-    if (window.isMinimized()) window.restore();
-    window.focus();
+  else {
+    openFiles(files);
+    // Windows lets the window come forward only while handling this event.
+    if (window && !window.isDestroyed()) {
+      if (window.isMinimized()) window.restore();
+      window.focus();
+    }
   }
 });
 {
   const link = linkArgument(process.argv);
   if (link) openLink(link);
 }
+// Documents opened from Finder or Explorer are imported like any other file:
+// PDFs into papers, where long ones wait for the reader's choice, and EPUBs
+// into books. An identical file resolves to the existing document. The
+// renderer opens the first of each batch once it may be read.
+type OpenedFiles = {
+  documents: string[];
+  large: Array<{ id: string; name: string; pages: number }>;
+};
 const pendingFiles: string[] = [];
+const pendingOpened: OpenedFiles[] = [];
+let openedClaimed = false;
+let filesScheduled: NodeJS.Timeout | undefined;
+function openFiles(paths: string[]) {
+  if (!paths.length) return;
+  pendingFiles.push(...paths);
+  // Finder delivers a multiple selection as separate open-file events.
+  if (serverURL && !recoveryServer && !filesScheduled)
+    filesScheduled = setTimeout(() => void flushFiles(), 100);
+}
+async function flushFiles() {
+  filesScheduled = undefined;
+  const paths = pendingFiles.splice(0);
+  if (!paths.length) return;
+  const opened: OpenedFiles = { documents: [], large: [] };
+  try {
+    for (const path of paths) {
+      const { documents, large } = await importPaths(
+        [path],
+        /\.pdf$/i.test(path) ? "papers" : "books",
+      );
+      opened.documents.push(...documents);
+      opened.large.push(...large);
+    }
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    diagnostics?.logs.record("desktop", {
+      level: "error",
+      event: "open_with.import_failed",
+      count: paths.length,
+      errorCode: ["EPERM", "EACCES", "EBUSY", "ENOENT"].includes(code || "")
+        ? code
+        : "import",
+    });
+    dialog.showErrorBox("导入失败", (error as Error).message);
+  }
+  if (!opened.documents.length && !opened.large.length) return;
+  if (openedClaimed && window && !window.isDestroyed()) {
+    window.webContents.send("neoread:open-files", opened);
+    if (window.isMinimized()) window.restore();
+    window.focus();
+  } else pendingOpened.push(opened);
+}
 app.on("open-file", (event, path) => {
   event.preventDefault();
-  if (serverURL && !recoveryServer)
-    void importPaths([path]).catch((e) =>
-      dialog.showErrorBox("导入失败", e.message),
-    );
-  else pendingFiles.push(path);
+  openFiles([path]);
 });
+if (process.platform !== "darwin")
+  openFiles(
+    documentArguments(process.argv, process.cwd(), !!process.defaultApp),
+  );
 app
   .whenReady()
   .then(async () => {
@@ -786,6 +847,15 @@ app
       linksClaimed = true;
       return pendingLinks.splice(0);
     });
+    ipcMain.handle("neoread:take-opened-files", (event) => {
+      if (
+        event.sender !== window?.webContents ||
+        event.senderFrame !== window.webContents.mainFrame
+      )
+        throw new Error("Invalid sender");
+      openedClaimed = true;
+      return pendingOpened.splice(0);
+    });
     ipcMain.handle(
       "neoread:open-codex-thread",
       async (event, threadId: unknown) => {
@@ -985,7 +1055,8 @@ app
         });
         return selected.canceled
           ? []
-          : importPaths(selected.filePaths, library, false, folder);
+          : (await importPaths(selected.filePaths, library, false, folder))
+              .large;
       },
     );
     ipcMain.handle(
@@ -1008,7 +1079,7 @@ app
           if (path) largePapers.delete(id);
           return path ? [path] : [];
         });
-        await importPaths(paths, library, true, folder);
+        return (await importPaths(paths, library, true, folder)).documents;
       },
     );
     await window.loadURL(
@@ -1028,8 +1099,7 @@ app
         app.getPath("userData"),
         migration,
       );
-    if (!recoveryServer && pendingFiles.length)
-      await importPaths(pendingFiles.splice(0));
+    if (!recoveryServer) await flushFiles();
     updateService = await startUpdateService(window);
     ipcMain.handle("neoread:check-updates", (event) => {
       if (

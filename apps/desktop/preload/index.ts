@@ -114,6 +114,15 @@ contextBridge.exposeInMainWorld("neoreadDesktop", {
       .then((targets: unknown[]) => targets.forEach(callback));
     return () => ipcRenderer.removeListener("neoread:open-link", listener);
   },
+  onOpenFiles: (callback: (opened: unknown) => void) => {
+    const listener = (_event: unknown, opened: unknown) => callback(opened);
+    ipcRenderer.on("neoread:open-files", listener);
+    // Files opened before this listener are delivered once.
+    void ipcRenderer
+      .invoke("neoread:take-opened-files")
+      .then((batches: unknown[]) => batches.forEach(callback));
+    return () => ipcRenderer.removeListener("neoread:open-files", listener);
+  },
   onLibraryChanged: (callback: () => void) => {
     const listener = () => callback();
     ipcRenderer.on("neoread:library-changed", listener);
