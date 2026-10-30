@@ -4,12 +4,18 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      release-tag:
+        description: "Existing published tag to rebuild and upload; empty for a dry run"
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.event.release.tag_name || github.ref }}
+  group: release-${{ inputs.release-tag || github.event.release.tag_name || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -24,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event.release.tag_name || github.sha }}
+          ref: ${{ inputs.release-tag || github.event.release.tag_name || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -32,8 +38,16 @@ jobs:
       - name: Validate versions and pin source commit
         id: source
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ inputs.release-tag || github.event.release.tag_name }}
         run: node scripts/release-source.mjs
+
+      - name: Require an existing published release for manual recovery
+        if: inputs.release-tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = false
 
       - name: Reuse successful CI for this exact source commit
         id: ci
@@ -57,7 +71,7 @@ jobs:
     secrets: inherit
     with:
       ref: ${{ needs.prepare.outputs.sha }}
-      release-tag: ${{ github.event.release.tag_name || '' }}
+      release-tag: ${{ inputs.release-tag || github.event.release.tag_name || '' }}
       mac-only: ${{ contains(github.event.release.body, '<!-- neoread:mac-only -->') }}
 
   publish:
@@ -84,15 +98,15 @@ jobs:
       - name: Verify complete installer set and generate checksums
         run: node scripts/release-assets.mjs
       - name: Store checksums for manual dry runs
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.release-tag == ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: neoread-checksums
           path: release/SHA256SUMS.txt
       - name: Attach installers to the published release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || inputs.release-tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ inputs.release-tag || github.event.release.tag_name }}
         run: node scripts/release-assets.mjs --upload
