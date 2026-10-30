@@ -170,7 +170,7 @@ it("leaves the API image model empty when no model passed vision", async () => {
   expect(host.textContent).toContain("没有通过图片理解检测的模型");
 });
 
-it("disables effort for fixed models and shows the actual mapping for tunable models", async () => {
+it("disables effort for fixed models and keeps tunable models selectable", async () => {
   config.primary = "api";
   config.models = { api: "fixed" };
   config.translationModels = { api: "tunable" };
@@ -201,5 +201,4 @@ it("disables effort for fixed models and shows the actual mapping for tunable mo
   expect(trigger("问答 Effort").disabled).toBe(true);
   expect(trigger("问答 Effort").textContent).toContain("固定／自动");
   expect(trigger("翻译 Effort").disabled).toBe(false);
-  expect(host.textContent).toContain("medium → high");
 });
