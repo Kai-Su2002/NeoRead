@@ -132,6 +132,7 @@ func TestAutoLookupPreference(t *testing.T) {
 }
 
 func TestResolveLargePaperConfirmation(t *testing.T) {
+	lowerLargePaperBytes(t)
 	for _, library := range []string{"papers", "books"} {
 		t.Run(library, func(t *testing.T) {
 			s := testServer(t)

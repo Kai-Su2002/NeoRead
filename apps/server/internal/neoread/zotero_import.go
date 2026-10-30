@@ -250,7 +250,7 @@ func (s *Server) importZoteroEntryTo(ctx context.Context, e *zoteroEntry, librar
 	}
 	if fresh {
 		pages, _ := pdfPageCount(temp.Name())
-		if library == "papers" && !allowLarge && (pages > largePaperPages || size > largePaperBytes) {
+		if library == "papers" && !allowLarge && largePaper(pages, size) {
 			return result, importError{409, "检测到 PDF 过大，请确认是否是论文？如果是图书类，请导入图书库。", "large-paper", pages}
 		}
 		d = Document{ID: docID, Type: "pdf", Library: library, Title: zoteroStripBraces(e.Title), Size: size, CreatedAt: zoteroDate(e.added), LastOpenedAt: "", Tags: []string{}, Folders: []string{}}

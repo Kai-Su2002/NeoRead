@@ -200,7 +200,7 @@ func (s *Server) importEndnoteEntry(ctx context.Context, e *endnoteEntry, librar
 		return result, err
 	}
 	pages, _ := pdfPageCount(input)
-	if library == "papers" && !allowLarge && (pages > largePaperPages || size > largePaperBytes) {
+	if library == "papers" && !allowLarge && largePaper(pages, size) {
 		return result, importError{409, "检测到 PDF 过大，请确认是否是论文？如果是图书类，请导入图书库。", "large-paper", pages}
 	}
 	cleaned, pdfResult, err := convert(ctx, input, work)

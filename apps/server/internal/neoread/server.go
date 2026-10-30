@@ -464,7 +464,7 @@ func (s *Server) importFileToCategory(ctx context.Context, temp, filename, libra
 			return failure(400, reason)
 		}
 		pages, _ := pdfPageCount(temp)
-		if (pages > largePaperPages || size > largePaperBytes) && !allowLarge {
+		if largePaper(pages, size) && !allowLarge {
 			return Document{}, 409, importError{409, "检测到 PDF 过大，请确认是否是论文？如果是图书类，请导入图书库。", "large-paper", pages}
 		}
 	}
