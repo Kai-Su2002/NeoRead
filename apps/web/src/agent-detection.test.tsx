@@ -211,3 +211,28 @@ it("does not show old green checks after a text retry disconnects", async () => 
   expect(host.querySelector('[aria-label="文本推理：未通过"]')).not.toBeNull();
   expect(host.querySelector('[aria-label="图片理解：已通过"]')).toBeNull();
 });
+
+it("defaults the card stack to Codex and preserves a saved choice", async () => {
+  const saved = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => saved.get(key) ?? null,
+    setItem: (key: string, value: string) => saved.set(key, value),
+    removeItem: (key: string) => saved.delete(key),
+  });
+  await render();
+  expect(
+    host
+      .querySelector('.agent-stack-card[data-depth="0"]')
+      ?.getAttribute("data-agent"),
+  ).toBe("codex");
+  await act(async () => root.unmount());
+  localStorage.setItem("neoread.agent-deck-front", "api");
+  root = createRoot(host);
+  await render();
+  expect(
+    host
+      .querySelector('.agent-stack-card[data-depth="0"]')
+      ?.getAttribute("data-agent"),
+  ).toBe("api");
+  localStorage.removeItem("neoread.agent-deck-front");
+});

@@ -92,20 +92,24 @@ const submit = async () =>
       new Event("submit", { bubbles: true, cancelable: true }),
     ),
   );
-const openAPI = async () =>
-  act(async () =>
-    (
-      host.querySelector('[aria-label="配置 API Key"]') as HTMLButtonElement
-    ).click(),
-  );
+const click = async (selector: string) =>
+  act(async () => (host.querySelector(selector) as HTMLButtonElement).click());
+// Agent controls live in the deck, which opens from the stacked cards.
+const expand = async () => {
+  if (!host.querySelector('[data-tour="agent-deck"]'))
+    await click('[aria-label="展开 Agent 卡片"]');
+};
+const openAPI = async () => {
+  await expand();
+  await click('[aria-label="配置 API Key"]');
+};
 const apiCard = '[data-tour="agent-card"][data-agent="api"]';
-const selectAPI = async () =>
-  act(async () =>
-    (
-      host.querySelector(`${apiCard} [role="radio"]`) as HTMLButtonElement
-    ).click(),
-  );
+const selectAPI = async () => {
+  await expand();
+  await click(`${apiCard} [role="radio"]`);
+};
 beforeEach(() => {
+  vi.stubGlobal("matchMedia", () => ({ matches: true }));
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("PointerEvent", MouseEvent);
   vi.clearAllMocks();
@@ -330,13 +334,11 @@ it("selects the API agent from its card once a model passes", async () => {
   );
   expect(host.querySelector(apiCard)?.hasAttribute("data-selected")).toBe(true);
 });
-it("asks for an API key before the card can be selected", async () => {
+it("opens the API settings from an unconfigured card", async () => {
   config.primary = "";
   await act(async () => root.render(<Settings open onOpenChange={() => {}} />));
   await selectAPI();
-  expect(toast.warning).toHaveBeenLastCalledWith(
-    "API 未配置好：需要先配置 API Key",
-  );
+  expect(input("Base URL")).not.toBeNull();
   expect(api.saveAIConfig).not.toHaveBeenCalled();
 });
 it("adds and removes a model ID by hand and checks it", async () => {

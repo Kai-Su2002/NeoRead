@@ -937,7 +937,14 @@ export function App() {
           job={jobs.find((job) => job.documentId === usageDocument?.id)}
           onClose={() => setUsageDocument(null)}
         />
-        <Settings open={settings} onOpenChange={setSettings} />
+        <Settings
+          open={settings}
+          onOpenChange={setSettings}
+          onOpenGuide={() => {
+            setSettings(false);
+            setGuide(true);
+          }}
+        />
         <ImportPaperDialog
           open={importingPaper}
           onOpenChange={setImportingPaper}
