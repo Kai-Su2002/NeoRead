@@ -136,7 +136,7 @@ export function ProxySettings({ open }: { open: boolean }) {
             onClick={() => void perform("save")}
           >
             {operation === "save" && <LoaderCircle className="animate-spin" />}
-            保存代理设置
+            保存
           </Button>
         </div>
         {mode === "manual" && (
@@ -212,7 +212,7 @@ export function ProxySettings({ open }: { open: boolean }) {
             onClick={() => void perform("check")}
           >
             {operation === "check" && <LoaderCircle className="animate-spin" />}
-            检测连接
+            检测
           </Button>
         </div>
         {!(

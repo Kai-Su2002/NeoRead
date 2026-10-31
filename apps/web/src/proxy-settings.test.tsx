@@ -99,7 +99,7 @@ it("checks ChatGPT with the unsaved draft without calling save", async () => {
   expect(host.textContent).toContain("chatgpt.com/robots.txt");
   expect(input("检测地址")).toBeNull();
   await type("代理端口", "7897");
-  await click("检测连接");
+  await click("检测");
   expect(check).toHaveBeenCalledWith({
     mode: "manual",
     host: "127.0.0.1",
@@ -114,9 +114,9 @@ it("checks ChatGPT with the unsaved draft without calling save", async () => {
 
 it("shows a restart reminder after successful persistence without restarting", async () => {
   await render();
-  expect(button("保存代理设置").disabled).toBe(true);
+  expect(button("保存").disabled).toBe(true);
   await type("代理端口", "7897");
-  await click("保存代理设置");
+  await click("保存");
   expect(save).toHaveBeenCalledWith({
     mode: "manual",
     host: "127.0.0.1",
@@ -146,10 +146,10 @@ it("reloads a completed save after closing and reopening settings", async () => 
   });
   await render();
   await type("代理端口", "7897");
-  await click("保存代理设置");
+  await click("保存");
   await render(false);
   await render();
-  expect(button("检测连接").disabled).toBe(true);
+  expect(button("检测").disabled).toBe(true);
   await act(async () => finish());
   expect(input("代理端口").value).toBe("7897");
   expect(host.textContent).toContain("代理配置已变化，重启 NeoRead 后生效。");
@@ -159,7 +159,7 @@ it("shows the system restart reminder and tests the active configuration", async
   state = { settings: { mode: "system" }, restartRequired: false };
   await render();
   expect(host.textContent).toContain("切换系统代理后，请重启 NeoRead 再检测。");
-  await click("检测连接");
+  await click("检测");
   expect(check).toHaveBeenCalledWith({ mode: "system" });
   expect(save).not.toHaveBeenCalled();
   expect(button("重启 NeoRead")).toBeUndefined();
@@ -183,7 +183,7 @@ it.each([
       message,
     });
     await render();
-    await click("检测连接");
+    await click("检测");
     expect(host.querySelector('[role="status"]')?.textContent).toContain(
       `${message} · ${elapsedMs} ms · ${label}`,
     );
@@ -194,21 +194,21 @@ it("keeps unsaved fields and allows retry when saving fails", async () => {
   await render();
   save.mockRejectedValueOnce(new Error("无法保存代理设置"));
   await type("代理端口", "7897");
-  await click("保存代理设置");
+  await click("保存");
   expect(host.querySelector('[role="alert"]')?.textContent).toBe(
     "无法保存代理设置",
   );
   expect(input("代理端口").value).toBe("7897");
-  expect(button("保存代理设置").disabled).toBe(false);
+  expect(button("保存").disabled).toBe(false);
   expect(button("重启 NeoRead")).toBeUndefined();
-  await click("保存代理设置");
+  await click("保存");
   expect(host.textContent).toContain("代理配置已变化，重启 NeoRead 后生效。");
 });
 
 it("rejects a nonnumeric port before calling the desktop", async () => {
   await render();
   await type("代理端口", "7e3");
-  await click("检测连接");
+  await click("检测");
   expect(check).not.toHaveBeenCalled();
   expect(host.querySelector('[role="alert"]')?.textContent).toContain("整数");
 });
@@ -222,8 +222,8 @@ it("prevents concurrent checks and drops results from an earlier settings sessio
       }),
   );
   await render();
-  await click("检测连接");
-  expect(button("检测连接").disabled).toBe(true);
+  await click("检测");
+  expect(button("检测").disabled).toBe(true);
   expect(input("代理端口").disabled).toBe(true);
   await render(false);
   await render();
@@ -259,6 +259,6 @@ it("switches between system, manual and direct modes using the real tabs", async
   expect(input("代理地址").value).toBe("127.0.0.1");
   expect(input("代理端口").value).toBe("7890");
   await chooseMode("直连");
-  await click("保存代理设置");
+  await click("保存");
   expect(save).toHaveBeenLastCalledWith({ mode: "direct" });
 });
