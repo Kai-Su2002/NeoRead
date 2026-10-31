@@ -229,6 +229,8 @@ it("groups proxy settings and log export under diagnostics without a network tab
   await act(async () => exportButton.click());
   expect(exportLogs).toHaveBeenCalledOnce();
 });
+// These multi-step integration cases exercise real Base UI controls and both
+// capability checks; 10s is too tight on the shared CI runner.
 it("saves the API endpoint and key, then tests the new connection", async () => {
   await act(async () => root.render(<Settings open onOpenChange={() => {}} />));
   expect(input("Base URL")).toBeNull();
@@ -259,7 +261,7 @@ it("saves the API endpoint and key, then tests the new connection", async () => 
   expect(toast.warning).not.toHaveBeenCalled();
   expect(input("API Key").value).toBe("");
   expect(input("API Key").placeholder).toBe("已保存，留空保持不变");
-});
+}, 20_000);
 it("selects the API agent from its card once a model passes", async () => {
   config.primary = "";
   config.api = { url: "https://api.example.com", model: "", hasKey: true };
@@ -339,7 +341,7 @@ it("rechecks a saved API model with a per-stage wait limit without changing conf
   await act(async () => retry()!.click());
   expect(api.testAI).toHaveBeenCalledWith("api", "text", "slow-model");
   expect(api.saveAIConfig).not.toHaveBeenCalled();
-});
+}, 20_000);
 
 it("shows the latest first-output observations including zero, without inventing missing timings", async () => {
   config.api = { url: "https://api.example.com", model: "", hasKey: true };
