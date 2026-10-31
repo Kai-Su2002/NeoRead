@@ -53,14 +53,14 @@ export function AppearancePicker({
       <div
         className={
           layout === "settings"
-            ? "flex items-center justify-between gap-3"
+            ? "grid grid-cols-2 items-center gap-3"
             : undefined
         }
       >
         {layout === "settings" && (
           <h3 className="shrink-0 text-sm font-medium">界面主题</h3>
         )}
-        <div className={layout === "settings" ? "min-w-0 flex-1" : undefined}>
+        <div className={layout === "settings" ? "min-w-0" : undefined}>
           <Choices<AppearanceChoice>
             label="配色"
             value={choice}
@@ -75,13 +75,7 @@ export function AppearancePicker({
             layout === "settings" ? "grid grid-cols-2 gap-3" : "space-y-2"
           }
         >
-          <div
-            className={
-              layout === "settings"
-                ? "min-w-0 space-y-2"
-                : "grid grid-cols-[auto_1fr] items-center gap-3"
-            }
-          >
+          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
             <span className="text-sm text-muted-foreground">系统浅色时</span>
             <Choices
               label="系统浅色时的配色"
@@ -93,13 +87,7 @@ export function AppearancePicker({
               onChange={(systemLightMode) => setTheme({ systemLightMode })}
             />
           </div>
-          <div
-            className={
-              layout === "settings"
-                ? "min-w-0 space-y-2"
-                : "grid grid-cols-[auto_1fr] items-center gap-3"
-            }
-          >
+          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
             <span className="text-sm text-muted-foreground">系统深色时</span>
             <Choices
               label="系统深色时的配色"
