@@ -66,7 +66,7 @@ import { DocumentTabs, ReadingWorkspaces } from "./DocumentTabs";
 import { flushProgress } from "./progress";
 import { useProcessing } from "./ProcessingStatus";
 import { useUpdateProgress } from "./update-progress";
-import { useResolvedTheme } from "./appearance";
+import { applyDocumentTheme, useResolvedTheme } from "./appearance";
 import { LibraryFilterBar, LibraryTagFilters } from "./DocumentManagement";
 import { TagBoards } from "./TagBoards";
 import { LibraryDocuments } from "./LibraryDocuments";
@@ -177,15 +177,7 @@ export function App() {
   }, [mode, loading]);
   useSaveReaderSettings(theme, settingsHydrated);
   useEffect(() => {
-    const dark = resolvedTheme.mode === "dark";
-    const root = document.documentElement;
-    root.classList.toggle("dark", dark);
-    root.dataset.theme = resolvedTheme.mode;
-    // Graphite ("soft") and pure black ("high") are both dark mode.
-    if (dark)
-      root.dataset.darkContrast = resolvedTheme.pdfDarkContrast ?? "soft";
-    else delete root.dataset.darkContrast;
-    root.style.colorScheme = dark ? "dark" : "light";
+    applyDocumentTheme(resolvedTheme);
     void window.neoreadDesktop
       ?.setAppearance(theme.appearance ?? "system", {
         pdfDarkContrast: theme.pdfDarkContrast,

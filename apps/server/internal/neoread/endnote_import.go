@@ -9,9 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"neoread.local/server/internal/runtimeenv"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -41,7 +41,7 @@ func migrateEndnotePDF(ctx context.Context, input, work string) (string, endnote
 	output, report := filepath.Join(work, "cleaned.pdf"), filepath.Join(work, "marks.json")
 	child, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(child, node, filepath.Join(filepath.Dir(processor), "endnote-pdf-cli.mjs"), "--input", input, "--output", output, "--report", report)
+	cmd := runtimeenv.CommandContext(child, node, filepath.Join(filepath.Dir(processor), "endnote-pdf-cli.mjs"), "--input", input, "--output", output, "--report", report)
 	cmd.Env = append(os.Environ(), "ELECTRON_RUN_AS_NODE=1")
 	cmd.Dir = work
 	cmd.WaitDelay = time.Second

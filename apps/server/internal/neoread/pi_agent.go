@@ -9,7 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
+	"neoread.local/server/internal/runtimeenv"
 	"path/filepath"
 	"strings"
 	"time"
@@ -63,7 +63,7 @@ func runPiWorker(ctx context.Context, root string, request piRequest, event func
 	defer os.RemoveAll(work)
 	child, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cmd := exec.CommandContext(child, node, worker)
+	cmd := runtimeenv.CommandContext(child, node, worker)
 	cmd.Dir, cmd.Env, cmd.Stderr = work, append(os.Environ(), "ELECTRON_RUN_AS_NODE=1"), io.Discard
 	cmd.WaitDelay = 3 * time.Second
 	input, err := cmd.StdinPipe()

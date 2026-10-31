@@ -3,6 +3,7 @@
 interface Window {
   neoreadDesktop?: {
     platform: string;
+    startupAppearance?: Partial<import("@neoread/core").ReaderTheme>;
     exportDiagnostics?: () => Promise<boolean>;
     recordDiagnostic?: (
       event: import("../../../packages/neoread-core/src/diagnostics").DiagnosticEvent,

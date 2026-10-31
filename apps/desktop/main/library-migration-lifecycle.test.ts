@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
+import { startupAppearanceFromArguments } from "../startup-appearance";
 
 // Exercise the real main-process close/flush handlers; only OS boundaries are fake.
 let app: EventEmitter & {
@@ -14,6 +15,13 @@ let window: EventEmitter & {
     mainFrame: { url: string };
   };
 };
+let windowOptions: { webPreferences?: { additionalArguments?: string[] } };
+let minimumDisplay: ReturnType<typeof vi.fn>;
+let finishMinimum: () => void;
+let prepareExit: ReturnType<typeof vi.fn>;
+let exitAnimation: ReturnType<typeof vi.fn>;
+let finishPreparation: () => void;
+let feedbackDestroyed = false;
 let auxiliaryWindowOpen = false;
 let quittingWindows = false;
 let citationStop: ReturnType<typeof vi.fn>;
@@ -23,6 +31,10 @@ let migrate: ReturnType<typeof vi.fn>;
 let stop: ReturnType<typeof vi.fn>;
 let serverSpawn: ReturnType<typeof vi.fn>;
 let libraryDirectory: ReturnType<typeof vi.fn>;
+let discoverPath: ReturnType<typeof vi.fn>;
+let openProxy: ReturnType<typeof vi.fn>;
+let detectMigration: ReturnType<typeof vi.fn>;
+let confirmMigration: ReturnType<typeof vi.fn>;
 let legacyMigrate: ReturnType<typeof vi.fn>;
 let diagnosticLog: ReturnType<typeof vi.fn>;
 let diagnostics: {
@@ -43,6 +55,44 @@ const move = () => handlers.get("neoread:move-library")!(event());
 
 beforeEach(async ({ task }) => {
   vi.resetModules();
+  feedbackDestroyed = false;
+  exitAnimation = vi.fn(async () => {});
+  prepareExit = vi.fn(() =>
+    task.name.includes("while preparing startup exit")
+      ? new Promise((resolve) => {
+          finishPreparation = () => resolve(exitAnimation);
+        })
+      : Promise.resolve(exitAnimation),
+  );
+  vi.doMock("./startup-exit", () => ({ prepareStartupExit: prepareExit }));
+  minimumDisplay = vi.fn(() =>
+    task.name.includes("during the minimum display interval")
+      ? new Promise<void>((resolve) => {
+          finishMinimum = resolve;
+        })
+      : Promise.resolve(),
+  );
+  vi.doMock("./startup-appearance-cache", () => ({
+    saveStartupAppearance: vi.fn(async () => {}),
+  }));
+  vi.doMock("./startup-window", () => ({
+    createStartupWindow: vi.fn(() => ({
+      nativeWindow: {
+        isDestroyed: () => feedbackDestroyed,
+        isMaximized: () => {
+          if (feedbackDestroyed) throw new Error("Object has been destroyed");
+          return false;
+        },
+        isMinimized: () => false,
+        getBounds: () => ({ x: 50, y: 60, width: 1440, height: 940 }),
+        show: vi.fn(),
+        focus: vi.fn(),
+      },
+      waitForMinimumDisplay: minimumDisplay,
+      load: async () => {},
+      dispose: vi.fn(),
+    })),
+  }));
   loadURL = vi.fn();
   validate = vi.fn().mockResolvedValue(undefined);
   saveLocation = vi.fn().mockResolvedValue(undefined);
@@ -110,8 +160,9 @@ beforeEach(async ({ task }) => {
         send: vi.fn(),
         setWindowOpenHandler() {},
       });
-      constructor() {
+      constructor(options: typeof windowOptions) {
         super();
+        windowOptions = options;
         window = this;
       }
       isDestroyed() {
@@ -121,6 +172,8 @@ beforeEach(async ({ task }) => {
         loadURL(url);
       }
       show = vi.fn();
+      setBounds = vi.fn();
+      maximize = vi.fn();
       focus = vi.fn();
       isMinimized = () => false;
       close() {
@@ -196,20 +249,29 @@ beforeEach(async ({ task }) => {
     migrateLibrary: migrate,
     stopLibraryServer: stop,
   }));
+  detectMigration = vi.fn().mockResolvedValue("none");
+  confirmMigration = vi.fn().mockResolvedValue(true);
+  vi.doMock("./migration-confirmation", () => ({
+    confirmReaderMigration: confirmMigration,
+  }));
   legacyMigrate = vi.fn().mockResolvedValue({ status: "not-needed" });
   vi.doMock("./legacy-data", () => ({
     migrateReaderData: legacyMigrate,
+    detectReaderMigration: detectMigration,
+    declineReaderMigration: vi.fn(async () => {}),
     ReaderMigrationError: class extends Error {},
     promptLegacyCleanup: async () => {},
   }));
-  vi.doMock("./agent-path", () => ({ agentPath: async () => "/bin" }));
+  discoverPath = vi.fn().mockResolvedValue("/bin");
+  openProxy = vi.fn().mockResolvedValue({
+    activeEnvironment: {},
+    activeSettings: {},
+    stop() {},
+  });
+  vi.doMock("./agent-path", () => ({ agentPath: discoverPath }));
   vi.doMock("./proxy-settings", () => ({
     ProxySettingsService: {
-      open: async () => ({
-        activeEnvironment: {},
-        activeSettings: {},
-        stop() {},
-      }),
+      open: openProxy,
     },
     electronProxyConfiguration: () => ({}),
   }));
@@ -236,7 +298,10 @@ beforeEach(async ({ task }) => {
     commandLineStatus: vi.fn(),
     setCommandLine: vi.fn(),
   }));
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({})));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation(async () => Response.json({})),
+  );
   vi.stubGlobal(
     "process",
     Object.assign(
@@ -252,6 +317,14 @@ beforeEach(async ({ task }) => {
     ),
   );
   await import("./index");
+  if (task.name.includes("while preparing startup exit")) {
+    await vi.waitFor(() => expect(prepareExit).toHaveBeenCalledOnce());
+    return;
+  }
+  if (task.name.includes("during the minimum display interval")) {
+    await vi.waitFor(() => expect(minimumDisplay).toHaveBeenCalledOnce());
+    return;
+  }
   if (task.name.includes("server exits before readiness")) {
     await vi.waitFor(() => expect(diagnostics.failure).toHaveBeenCalledOnce());
     return;
@@ -461,6 +534,10 @@ it("waits for Reader migration before choosing or opening the library", async ()
   );
   await import("./index");
   await vi.waitFor(() => expect(legacyMigrate).toHaveBeenCalledOnce());
+  expect(diagnosticLog).toHaveBeenCalledWith(
+    "desktop",
+    expect.objectContaining({ event: "startup.loading_visible" }),
+  );
   expect(libraryDirectory).not.toHaveBeenCalled();
   expect(serverSpawn).not.toHaveBeenCalled();
   libraryDirectory.mockResolvedValue("/migrated/library");
@@ -703,4 +780,259 @@ it("macOS: updating follows the explicit quit path even before app before-quit",
   ipc.emit("neoread:flushed", event(), null);
   expect(citationStop).toHaveBeenCalledOnce();
   expect(serverSpawn.mock.results[0].value.kill).toHaveBeenCalledOnce();
+});
+
+it.each(["required", "resume"])(
+  "holds all library work until confirmation for %s",
+  async (status) => {
+    vi.resetModules();
+    handlers.clear();
+    legacyMigrate.mockClear();
+    libraryDirectory.mockClear();
+    serverSpawn.mockClear();
+    detectMigration.mockResolvedValue(status);
+    let decide!: (value: boolean) => void;
+    confirmMigration.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          decide = resolve;
+        }),
+    );
+    await import("./index");
+    await vi.waitFor(() => expect(confirmMigration).toHaveBeenCalledOnce());
+    expect(confirmMigration.mock.calls[0][2]).toBe(status === "resume");
+    expect(legacyMigrate).not.toHaveBeenCalled();
+    expect(libraryDirectory).not.toHaveBeenCalled();
+    expect(serverSpawn).not.toHaveBeenCalled();
+    decide(true);
+    await vi.waitFor(() => expect(serverSpawn).toHaveBeenCalledOnce());
+    expect(legacyMigrate).toHaveBeenCalledOnce();
+  },
+);
+it.each(["required", "resume", "declined"])(
+  "skipping %s migration continues startup without migrating",
+  async (status) => {
+    vi.resetModules();
+    handlers.clear();
+    legacyMigrate.mockClear();
+    libraryDirectory.mockClear();
+    serverSpawn.mockClear();
+    detectMigration.mockResolvedValue(status);
+    confirmMigration.mockResolvedValue(false);
+    const quit = vi.spyOn(app, "quit").mockImplementation(() => {});
+    await import("./index");
+    await vi.waitFor(() =>
+      expect(handlers.has("neoread:check-updates")).toBe(true),
+    );
+    expect(quit).not.toHaveBeenCalled();
+    expect(legacyMigrate).not.toHaveBeenCalled();
+    const { declineReaderMigration } = await import("./legacy-data");
+    if (status === "declined") {
+      expect(confirmMigration).not.toHaveBeenCalled();
+      expect(declineReaderMigration).not.toHaveBeenCalled();
+    } else expect(declineReaderMigration).toHaveBeenCalledWith("/userdata");
+    expect(libraryDirectory).toHaveBeenCalledOnce();
+    expect(serverSpawn).toHaveBeenCalledOnce();
+    expect(handlers.has("neoread:import-library")).toBe(true);
+    expect(handlers.has("neoread:move-library")).toBe(true);
+  },
+);
+
+it("keeps loading feedback on top when activated during the minimum display interval", async () => {
+  await vi.waitFor(() => expect(minimumDisplay).toHaveBeenCalledOnce());
+  const mainWindow = window as typeof window & {
+    show: ReturnType<typeof vi.fn>;
+  };
+  expect(mainWindow.show).not.toHaveBeenCalled();
+  app.emit("activate");
+  app.emit("second-instance", {}, ["NeoRead.exe"], "/");
+  handlers.get("neoread:focus-window")!(event());
+  expect(mainWindow.show).not.toHaveBeenCalled();
+  finishMinimum();
+  await vi.waitFor(() => expect(mainWindow.show).toHaveBeenCalledOnce());
+});
+
+it("shows the themed window while proxy and PATH discovery are still pending", async () => {
+  vi.resetModules();
+  handlers.clear();
+  serverSpawn.mockClear();
+  loadURL.mockClear();
+  let finishProxy!: (value: unknown) => void;
+  let finishPath!: (value: string) => void;
+  openProxy.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishProxy = resolve;
+      }),
+  );
+  discoverPath.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishPath = resolve;
+      }),
+  );
+  const request = vi.mocked(fetch);
+  request.mockClear();
+  request.mockImplementation(async (input) =>
+    Response.json(
+      String(input).includes("/api/settings") ? { appearance: "dark" } : {},
+    ),
+  );
+  await import("./index");
+  await vi.waitFor(() =>
+    expect(handlers.has("neoread:check-updates")).toBe(true),
+  );
+  expect(serverSpawn).toHaveBeenCalledOnce();
+  expect(serverSpawn.mock.calls[0][1]).toContain("--desktop-runtime");
+  expect(loadURL).toHaveBeenCalledOnce();
+  const { nativeTheme } = await import("electron");
+  expect(nativeTheme.themeSource).toBe("dark");
+  expect(
+    startupAppearanceFromArguments(
+      windowOptions.webPreferences?.additionalArguments ?? [],
+    ),
+  ).toEqual({ appearance: "dark" });
+  expect(
+    request.mock.calls.some(([url]) =>
+      String(url).includes("/api/desktop-runtime/"),
+    ),
+  ).toBe(false);
+  finishProxy({
+    activeEnvironment: { HTTPS_PROXY: "http://127.0.0.1:7890" },
+    activeSettings: {},
+    stop() {},
+  });
+  await vi.waitFor(() =>
+    expect(
+      request.mock.calls.some(([url]) =>
+        String(url).endsWith("/desktop-runtime/network"),
+      ),
+    ).toBe(true),
+  );
+  expect(
+    request.mock.calls.some(([url]) =>
+      String(url).endsWith("/desktop-runtime/path"),
+    ),
+  ).toBe(false);
+  finishPath("/resolved/bin");
+  await vi.waitFor(() =>
+    expect(
+      request.mock.calls.some(
+        ([url, init]) =>
+          String(url).endsWith("/desktop-runtime/path") &&
+          init?.body === JSON.stringify({ PATH: "/resolved/bin" }),
+      ),
+    ).toBe(true),
+  );
+});
+it("does not show the main window until its theme request completes", async () => {
+  vi.resetModules();
+  handlers.clear();
+  loadURL.mockClear();
+  let finish!: (value: Response) => void;
+  vi.mocked(fetch).mockImplementation(async (input) =>
+    String(input).includes("/api/settings")
+      ? new Promise((resolve) => {
+          finish = resolve;
+        })
+      : Response.json({}),
+  );
+  await import("./index");
+  await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+  expect(loadURL).not.toHaveBeenCalled();
+  finish(Response.json({ appearance: "light" }));
+  await vi.waitFor(() => expect(loadURL).toHaveBeenCalledOnce());
+  const { nativeTheme } = await import("electron");
+  expect(nativeTheme.themeSource).toBe("light");
+});
+
+it("reports a theme read failure without showing a fallback-themed window", async () => {
+  vi.resetModules();
+  handlers.clear();
+  loadURL.mockClear();
+  diagnostics.failure.mockClear();
+  vi.mocked(fetch).mockImplementation(async (input) =>
+    String(input).includes("/api/settings")
+      ? new Response("unavailable", { status: 503 })
+      : Response.json({}),
+  );
+  await import("./index");
+  await vi.waitFor(() => expect(diagnostics.failure).toHaveBeenCalledOnce());
+  expect(loadURL).not.toHaveBeenCalled();
+});
+
+it.each([null, "save failed"])(
+  "does not reveal the main window when quitting during the minimum display interval (flush: %s)",
+  async (error) => {
+    const main = window as typeof window & { show: ReturnType<typeof vi.fn> };
+    const { createStartupWindow } = await import("./startup-window");
+    const startup = vi.mocked(createStartupWindow).mock.results[0].value;
+    app.quit();
+    expect(window.webContents.send).toHaveBeenCalledWith("neoread:flush");
+    // Closing the loading window releases its timer while renderer flush is pending.
+    finishMinimum();
+    await vi.waitFor(() => expect(startup.dispose).toHaveBeenCalled());
+    expect(main.show).not.toHaveBeenCalled();
+    ipc.emit("neoread:flushed", event(), error);
+    if (error) await vi.waitFor(() => expect(main.show).toHaveBeenCalledOnce());
+  },
+);
+
+it("installs loading feedback before showing the real window and reveals it after disposing the old window", async () => {
+  const main = window as typeof window & {
+    show: ReturnType<typeof vi.fn>;
+    setBounds: ReturnType<typeof vi.fn>;
+  };
+  const { createStartupWindow } = await import("./startup-window");
+  const feedback = vi.mocked(createStartupWindow).mock.results[0].value;
+  expect(main.setBounds).toHaveBeenCalledWith({
+    x: 50, y: 60, width: 1440, height: 940,
+  });
+  expect(prepareExit).toHaveBeenCalledWith(feedback.nativeWindow, main);
+  expect(prepareExit.mock.invocationCallOrder[0]).toBeLessThan(
+    main.show.mock.invocationCallOrder[0],
+  );
+  expect(main.show.mock.invocationCallOrder[0]).toBeLessThan(
+    feedback.dispose.mock.invocationCallOrder[0],
+  );
+  expect(feedback.dispose.mock.invocationCallOrder[0]).toBeLessThan(
+    exitAnimation.mock.invocationCallOrder[0],
+  );
+  expect(exitAnimation).toHaveBeenCalledWith(true);
+});
+
+it("does not show the real window when quitting while preparing startup exit", async () => {
+  const main = window as typeof window & { show: ReturnType<typeof vi.fn> };
+  app.quit();
+  finishPreparation();
+  await vi.waitFor(() => expect(exitAnimation).toHaveBeenCalledWith(false));
+  expect(main.show).not.toHaveBeenCalled();
+  ipc.emit("neoread:flushed", event(), null);
+});
+
+it("returns to reading after cancelling quit while preparing startup exit", async () => {
+  app.quit();
+  feedbackDestroyed = true;
+  ipc.emit("neoread:flushed", event(), "save failed");
+  await vi.waitFor(() => expect(showMessageBox).toHaveBeenCalled());
+  finishPreparation();
+  await vi.waitFor(() => expect(handlers.has("neoread:check-updates")).toBe(true));
+  expect(exitAnimation).toHaveBeenCalledWith(true);
+  expect(diagnostics.failure).not.toHaveBeenCalled();
+});
+
+it("continues startup if the refusal marker cannot be saved", async () => {
+  vi.resetModules();
+  handlers.clear();
+  legacyMigrate.mockClear();
+  serverSpawn.mockClear();
+  detectMigration.mockResolvedValue("resume");
+  confirmMigration.mockResolvedValue(false);
+  const { declineReaderMigration } = await import("./legacy-data");
+  vi.mocked(declineReaderMigration).mockRejectedValueOnce(new Error("disk full"));
+  await import("./index");
+  await vi.waitFor(() => expect(handlers.has("neoread:check-updates")).toBe(true));
+  expect(legacyMigrate).not.toHaveBeenCalled();
+  expect(serverSpawn).toHaveBeenCalledOnce();
+  expect(diagnostics.record).toHaveBeenCalledWith("migration.decline_save_failed", expect.any(Error));
 });

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import { startupAppearanceFromArguments } from "../startup-appearance";
 import type { CiteEvent } from "../../../packages/api-client/src/cite-events";
 import type { ProxySettings } from "../../../packages/neoread-core/src/proxy-settings";
 import type { UpdateProgress } from "../../../packages/neoread-core/src/update-progress";
@@ -18,6 +19,7 @@ async function proxyRequest(channel: string, ...args: unknown[]) {
 }
 contextBridge.exposeInMainWorld("neoreadDesktop", {
   platform: process.platform,
+  startupAppearance: startupAppearanceFromArguments(process.argv),
   exportDiagnostics: () => ipcRenderer.invoke("neoread:export-diagnostics"),
   recordDiagnostic: (event: unknown) =>
     ipcRenderer.send("neoread:diagnostic-event", event),

@@ -8,7 +8,19 @@ import { installDiagnostics } from "./diagnostics";
 import { installMotionPreference } from "./motion";
 import { installScrollbars } from "./scrollbars";
 import { migrateReaderPreferences } from "./legacy-preferences";
+import { initialDesktopTheme } from "./appearance";
+import { useReaderStore } from "./store";
 migrateReaderPreferences();
+if (window.neoreadDesktop?.startupAppearance) {
+  useReaderStore
+    .getState()
+    .setTheme(
+      initialDesktopTheme(
+        window.neoreadDesktop.startupAppearance,
+        window.matchMedia("(prefers-color-scheme: dark)").matches,
+      ),
+    );
+}
 const removeMotion = installMotionPreference(document);
 if (import.meta.hot) import.meta.hot.dispose(removeMotion);
 const removeScrollbars = installScrollbars(document);

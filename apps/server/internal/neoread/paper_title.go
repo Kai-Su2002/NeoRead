@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"neoread.local/server/internal/runtimeenv"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -31,7 +31,7 @@ func (s *Server) quickPaperMetadata(ctx context.Context, d Document) (quickPaper
 	}
 	defer os.RemoveAll(work)
 	out := filepath.Join(work, "metadata.json")
-	cmd := exec.CommandContext(ctx, node, filepath.Join(filepath.Dir(worker), "paper-metadata.mjs"), "--input", s.Store.File(d), "--output", out)
+	cmd := runtimeenv.CommandContext(ctx, node, filepath.Join(filepath.Dir(worker), "paper-metadata.mjs"), "--input", s.Store.File(d), "--output", out)
 	cmd.Dir = work
 	cmd.Env = append(os.Environ(), "ELECTRON_RUN_AS_NODE=1")
 	cmd.WaitDelay = 3 * time.Second

@@ -1,3 +1,6 @@
+import { confirmReaderMigration } from "./migration-confirmation";
+import { startupAppearanceArgument } from "../startup-appearance";
+import { saveStartupAppearance } from "./startup-appearance-cache";
 import {
   app,
   autoUpdater,
@@ -22,6 +25,8 @@ import {
 import { startLibraryRecoveryServer } from "./library-recovery-server";
 import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
+import { createStartupWindow } from "./startup-window";
+import { prepareStartupExit } from "./startup-exit";
 import { agentPath } from "./agent-path";
 import { codexThreadURL } from "../../../packages/neoread-core/src/codex-link";
 import { annotationUndoShortcut } from "../../../packages/neoread-core/src/undo-shortcut";
@@ -42,6 +47,8 @@ import { devIsolation } from "./dev-isolation";
 import { documentArguments, documentFile } from "./open-files";
 import {
   migrateReaderData,
+  detectReaderMigration,
+  declineReaderMigration,
   ReaderMigrationError,
   promptLegacyCleanup,
   type ReaderMigration,
@@ -76,6 +83,25 @@ let child: ChildProcess | undefined;
 let serverURL = "";
 let serverToken = "";
 let window: BrowserWindow | undefined;
+let startupWindow: ReturnType<typeof createStartupWindow> | undefined;
+let startupStarted = performance.now();
+let bootstrapEntryMs: number | undefined;
+export function adoptStartupWindow(
+  startup: ReturnType<typeof createStartupWindow>,
+  startedAt: number,
+  entryMs: number,
+) {
+  startupWindow = startup;
+  startupStarted = startedAt;
+  bootstrapEntryMs = entryMs;
+}
+function startupStage(event: string, started = startupStarted) {
+  diagnostics?.logs.record("desktop", {
+    level: "info",
+    event,
+    durationMs: Math.round(performance.now() - started),
+  });
+}
 let documentTabActive = false;
 let citationService: ReturnType<typeof startCitationService> | undefined;
 let reopenMainWindow: (() => Promise<void>) | undefined;
@@ -83,6 +109,15 @@ let mainWindowOpening: Promise<void> | undefined;
 let quitRequested = false;
 function showMainWindow() {
   if (quitRequested || quitting) return;
+  if (startupWindow) {
+    const feedback = startupWindow.nativeWindow;
+    if (feedback && !feedback.isDestroyed()) {
+      if (feedback.isMinimized()) feedback.restore();
+      feedback.show();
+      feedback.focus();
+    }
+    return;
+  }
   if (window && !window.isDestroyed()) {
     if (window.isMinimized()) window.restore();
     window.show();
@@ -107,6 +142,8 @@ let quitting = false;
 let closing = false;
 let flushed = false;
 let restartRequested = false;
+let proxyReady: Promise<ProxySettingsService>;
+const runtimeController = new AbortController();
 let proxySettings: ProxySettingsService;
 let activeLibrary: string | undefined;
 let choosingLibrary = false;
@@ -142,7 +179,7 @@ const commandLineHost = () => ({
   env: process.env,
 });
 async function startServer() {
-  const childEnv = proxySettings.activeEnvironment;
+  const childEnv = process.env;
   serverToken = randomBytes(32).toString("hex");
   diagnostics?.logs.secrets.push(serverToken);
   diagnostics?.record("server.start_requested");
@@ -151,7 +188,7 @@ async function startServer() {
     ? join(process.resourcesPath, "web")
     : join(root, "web", "dist");
   const citePlugins = citePluginsDirectory();
-  const pathValue = await agentPath(childEnv, homedir(), process.platform);
+  if (quitting) throw new Error("Startup cancelled");
   child = spawn(
     binary,
     [
@@ -164,6 +201,7 @@ async function startServer() {
       "--data",
       activeLibrary!,
       "--shutdown-on-stdin",
+      "--desktop-runtime",
       "--web",
       web,
       "--cite-plugins",
@@ -174,7 +212,6 @@ async function startServer() {
       env: {
         ...childEnv,
         NEOREAD_TOKEN: serverToken,
-        PATH: pathValue,
         NEOREAD_NODE: process.execPath,
         NEOREAD_AGENT: app.isPackaged
           ? join(process.resourcesPath, "agent", "dist", "main.mjs")
@@ -318,7 +355,8 @@ async function importPaths(
 }
 // neoread:// links reach one window. The renderer claims queued links once its
 // listener exists; later links are sent directly.
-const primary = app.requestSingleInstanceLock();
+const primary =
+  app.hasSingleInstanceLock?.() || app.requestSingleInstanceLock();
 if (!primary) app.quit();
 const pendingLinks: NeoReadLinkTarget[] = [];
 let linksClaimed = false;
@@ -429,23 +467,68 @@ app
       () => activeLibrary,
       app.isPackaged,
     );
+    startupWindow ??= createStartupWindow(() => app.quit());
+    await startupWindow.load();
+    if (bootstrapEntryMs !== undefined)
+      diagnostics.logs.record("desktop", {
+        level: "info",
+        event: "startup.bootstrap_entry",
+        durationMs: bootstrapEntryMs,
+      });
+    startupStage("startup.loading_visible");
+    if (quitting) return;
     let migration: ReaderMigration | undefined;
     if (app.isPackaged) {
-      pendingReaderMigration = migrateReaderData(
-        serverBinary(),
+      const detection = await detectReaderMigration(
         app.getPath("appData"),
         app.getPath("userData"),
-        diagnostics,
-        migrationController.signal,
       );
-      try {
-        migration = await pendingReaderMigration;
-      } finally {
-        pendingReaderMigration = undefined;
+      diagnostics.logs.record("desktop", {
+        level: "info",
+        event: "migration.detected",
+        status: detection,
+      });
+      if (quitting) return;
+      let shouldMigrate = detection === "none";
+      if (detection === "required" || detection === "resume") {
+        const confirmed = await confirmReaderMigration(
+          join(process.resourcesPath, "web"),
+          join(__dirname, "migration-preload.cjs"),
+          detection === "resume",
+          migrationController.signal,
+          startupWindow.nativeWindow,
+        );
+        diagnostics.record(
+          confirmed ? "migration.confirmed" : "migration.declined",
+        );
+        if (quitting) return;
+        if (!confirmed) {
+          try {
+            await declineReaderMigration(app.getPath("userData"));
+          } catch (error) {
+            diagnostics.record("migration.decline_save_failed", error);
+          }
+        }
+        shouldMigrate = confirmed;
+      }
+      if (shouldMigrate) {
+        pendingReaderMigration = migrateReaderData(
+          serverBinary(),
+          app.getPath("appData"),
+          app.getPath("userData"),
+          diagnostics,
+          migrationController.signal,
+        );
+        try {
+          migration = await pendingReaderMigration;
+        } finally {
+          pendingReaderMigration = undefined;
+        }
       }
     }
     if (quitting) return;
     diagnostics.finishMigration();
+    startupStage("startup.migration_ready");
     ipcMain.on("neoread:diagnostic-event", (event, value) =>
       diagnostics!.receive(event, value),
     );
@@ -464,12 +547,36 @@ app
           ]);
         else app.setAsDefaultProtocolClient(scheme);
     }
-    proxySettings = await ProxySettingsService.open(
+    const proxyStarted = performance.now();
+    proxyReady = ProxySettingsService.open(
       app.getPath("userData"),
       process.env,
+    ).then(async (service) => {
+      proxySettings = service;
+      if (quitting) {
+        service.stop();
+        return service;
+      }
+      await session.defaultSession.setProxy(
+        electronProxyConfiguration(service.activeSettings),
+      );
+      startupStage("startup.proxy_ready", proxyStarted);
+      return service;
+    });
+    // Start both discoveries together; neither is a prerequisite for Go.
+    const pathStarted = performance.now();
+    const pathReady = agentPath(process.env, homedir(), process.platform).then(
+      (value) => {
+        startupStage("startup.agent_path_ready", pathStarted);
+        return value;
+      },
     );
-    await session.defaultSession.setProxy(
-      electronProxyConfiguration(proxySettings.activeSettings),
+    // Observe errors immediately while library initialization proceeds.
+    void proxyReady.catch((error) =>
+      diagnostics?.record("startup.proxy_failed", error),
+    );
+    void pathReady.catch((error) =>
+      diagnostics?.record("startup.agent_path_failed", error),
     );
     try {
       activeLibrary = await libraryDirectory(app.getPath("userData"));
@@ -486,9 +593,62 @@ app
           : join(root, "web", "dist"),
       );
     }
+    if (quitting) return;
     const url = recoveryServer
       ? (serverURL = recoveryServer.url)
       : await startServer();
+    if (quitting) return;
+    startupStage("startup.server_ready");
+    if (!recoveryServer) {
+      const sendRuntime = async (
+        stage: string,
+        value: Record<string, string | null>,
+      ) => {
+        if (quitting) return;
+        const response = await fetch(`${url}/api/desktop-runtime/${stage}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serverToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(value),
+          signal: AbortSignal.any([
+            runtimeController.signal,
+            AbortSignal.timeout(5000),
+          ]),
+        });
+        if (!response.ok) throw new Error("无法传递启动环境");
+      };
+      void proxyReady
+        .then((service) =>
+          sendRuntime(
+            "network",
+            Object.fromEntries(
+              [
+                "HTTP_PROXY",
+                "HTTPS_PROXY",
+                "ALL_PROXY",
+                "NO_PROXY",
+                "http_proxy",
+                "https_proxy",
+                "all_proxy",
+                "no_proxy",
+              ].map((key) => [key, service.activeEnvironment[key] ?? null]),
+            ),
+          ),
+        )
+        .catch((error) => {
+          if (!quitting)
+            diagnostics?.record("startup.network_delivery_failed", error);
+        });
+      void pathReady
+        .then((value) => sendRuntime("path", { PATH: value }))
+        .catch((error) => {
+          if (!quitting)
+            diagnostics?.record("startup.path_delivery_failed", error);
+        });
+    }
+
     session.defaultSession.setPermissionRequestHandler(
       (contents, permission, callback, details) => {
         // Only NeoRead's own page may list installed fonts, for the
@@ -514,11 +674,16 @@ app
       documentTabActive = false;
       const preferences: unknown = recoveryServer
         ? {}
-        : await fetch(`${url}/api/settings`, {
-            headers: { Authorization: `Bearer ${serverToken}` },
-          })
-            .then((r) => (r.ok ? r.json() : {}))
-            .catch(() => ({}));
+        : await fetch(
+            `${url}/api/settings${startupWindow ? "?startup=1" : ""}`,
+            {
+              headers: { Authorization: `Bearer ${serverToken}` },
+              signal: AbortSignal.timeout(3000),
+            },
+          ).then((r) => {
+            if (!r.ok) throw new Error("无法读取窗口主题设置");
+            return r.json();
+          });
       if (quitRequested || quitting) return;
       diagnostics!.setSettings(preferences);
       const appearance =
@@ -533,7 +698,13 @@ app
           : appearance === "sepia"
             ? "light"
             : "system";
+      startupStage("startup.preferences_ready");
+      void saveStartupAppearance(app.getPath("userData"), appearance).catch(
+        (error) =>
+          diagnostics?.record("startup.appearance_cache_failed", error),
+      );
       window = new BrowserWindow({
+        show: false,
         width: 1440,
         height: 940,
         minWidth: 1000,
@@ -548,6 +719,7 @@ app
         backgroundColor: windowBackground(appearance, preferences),
         webPreferences: {
           preload: join(__dirname, "preload.cjs"),
+          additionalArguments: [startupAppearanceArgument(preferences)],
           contextIsolation: true,
           nodeIntegration: false,
           sandbox: true,
@@ -628,6 +800,7 @@ app
               closing = false;
               restartRequested = false;
               quitRequested = false;
+              showMainWindow();
               return;
             }
           }
@@ -727,11 +900,64 @@ app
       await createdWindow.loadURL(
         `${url}/${recoveryServer ? "?libraryRecovery=1" : ""}#token=${serverToken}`,
       );
+      const feedback = startupWindow;
+      await feedback?.waitForMinimumDisplay();
+      let exitStartup: Awaited<ReturnType<typeof prepareStartupExit>> | undefined;
+      const canShow = () =>
+        !quitRequested && !quitting && !createdWindow.isDestroyed();
+      if (canShow() && feedback && !feedback.nativeWindow.isDestroyed()) {
+        try {
+          // Paint the same loading surface over the real renderer before showing
+          // it; a transparent native window would expose the desktop instead.
+          createdWindow.setBounds(feedback.nativeWindow.getBounds());
+          exitStartup = await prepareStartupExit(
+            feedback.nativeWindow,
+            createdWindow,
+          );
+        } catch (error) {
+          if (canShow()) diagnostics?.record("startup.exit_prepare_failed", error);
+        }
+      }
+      const reveal = canShow();
+      if (reveal) {
+        if (
+          feedback &&
+          !feedback.nativeWindow.isDestroyed() &&
+          feedback.nativeWindow.isMaximized()
+        )
+          createdWindow.maximize();
+        createdWindow.show();
+      }
+      feedback?.dispose();
+      if (startupWindow === feedback) startupWindow = undefined;
+      try {
+        await exitStartup?.(reveal);
+      } catch (error) {
+        if (canShow()) diagnostics?.record("startup.exit_failed", error);
+      }
+      startupStage("startup.renderer_loaded");
       if (window === createdWindow && !createdWindow.isDestroyed()) {
-        const updates = await startUpdateService(createdWindow);
-        if (quitting || window !== createdWindow || createdWindow.isDestroyed())
-          updates.stop();
-        else updateService = updates;
+        void proxyReady
+          .then(async () => {
+            if (
+              quitting ||
+              window !== createdWindow ||
+              createdWindow.isDestroyed()
+            )
+              return;
+            const updates = await startUpdateService(createdWindow);
+            if (
+              quitting ||
+              window !== createdWindow ||
+              createdWindow.isDestroyed()
+            )
+              updates.stop();
+            else updateService = updates;
+          })
+          .catch((error) => {
+            if (!quitting)
+              diagnostics?.record("startup.updates_deferred_failed", error);
+          });
       }
     };
     ipcMain.handle("neoread:clipboard-write", (event, text: unknown) =>
@@ -842,17 +1068,17 @@ app
         choosingLibrary = false;
       }
     });
-    ipcMain.handle("neoread:proxy-settings", (event) => {
+    ipcMain.handle("neoread:proxy-settings", async (event) => {
       settingsSender(event);
-      return proxySettings.state();
+      return (await proxyReady).state();
     });
-    ipcMain.handle("neoread:save-proxy-settings", (event, value: unknown) => {
+    ipcMain.handle("neoread:save-proxy-settings", async (event, value: unknown) => {
       settingsSender(event);
-      return proxySettings.save(value);
+      return (await proxyReady).save(value);
     });
-    ipcMain.handle("neoread:check-proxy", (event, value: unknown) => {
+    ipcMain.handle("neoread:check-proxy", async (event, value: unknown) => {
       settingsSender(event);
-      return proxySettings.check(value, serverBinary());
+      return (await proxyReady).check(value, serverBinary());
     });
     ipcMain.handle("neoread:command-line", (event) => {
       settingsSender(event);
@@ -887,6 +1113,10 @@ app
         // Paper is a light theme for native chrome with its own background.
         nativeTheme.themeSource = appearance === "sepia" ? "light" : appearance;
         window.setBackgroundColor(windowBackground(appearance, palettes));
+        void saveStartupAppearance(app.getPath("userData"), appearance).catch(
+          (error) =>
+            diagnostics?.record("startup.appearance_cache_failed", error),
+        );
       },
     );
     ipcMain.handle(
@@ -1108,6 +1338,10 @@ app
         event.senderFrame !== window.webContents.mainFrame
       )
         throw new Error("Invalid sender");
+      if (startupWindow) {
+        showMainWindow();
+        return;
+      }
       if (window.isMinimized()) window.restore();
       window.show();
       if (process.platform === "darwin") app.focus({ steal: true });
@@ -1298,6 +1532,9 @@ app.on("before-quit", (event) => {
     return;
   }
   quitting = true;
+  runtimeController.abort();
+  startupWindow?.dispose();
+  startupWindow = undefined;
   if (pendingReaderMigration) {
     event.preventDefault();
     if (!migrationController.signal.aborted) {

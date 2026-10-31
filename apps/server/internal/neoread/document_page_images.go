@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"image/png"
 	"io"
+	"neoread.local/server/internal/runtimeenv"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -87,7 +87,7 @@ func (s *Server) renderDocumentPages(ctx context.Context, c *documentCorpus, pag
 		defer os.RemoveAll(work)
 		child, cancel := context.WithTimeout(ctx, 3*time.Minute)
 		defer cancel()
-		cmd := exec.CommandContext(child, node, filepath.Join(filepath.Dir(processor), "render-pages.mjs"), "--input", s.Store.File(d), "--output", work, "--pages", strings.Join(missing, ","))
+		cmd := runtimeenv.CommandContext(child, node, filepath.Join(filepath.Dir(processor), "render-pages.mjs"), "--input", s.Store.File(d), "--output", work, "--pages", strings.Join(missing, ","))
 		cmd.Dir, cmd.Env, cmd.Stderr = work, append(os.Environ(), "ELECTRON_RUN_AS_NODE=1"), io.Discard
 		cmd.WaitDelay = 3 * time.Second
 		if err = cmd.Run(); err != nil {

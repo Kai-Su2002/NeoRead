@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"neoread.local/server/internal/runtimeenv"
 	"os"
 	"os/exec"
 	"strings"
@@ -61,7 +62,7 @@ func startCodexSession(work, model string, overrides []string, token string) (*c
 		args = append(args, "-c", setting)
 		addCodexOverride(effectiveOverrides, setting)
 	}
-	cmd := exec.Command("codex", args...)
+	cmd := runtimeenv.Command("codex", args...)
 	for _, setting := range overrides {
 		cmd.Args = append(cmd.Args, "-c", setting)
 		addCodexOverride(effectiveOverrides, setting)
