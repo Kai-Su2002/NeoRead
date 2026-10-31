@@ -740,48 +740,57 @@ export function Settings({
           </TabsContent>
           <TabsContent value="display" className="settings-panel" keepMounted>
             <section>
-              <h3
-                id="primary-library-label"
-                className="mb-3 text-sm font-medium"
-              >
-                主要模式
-              </h3>
-              <Tabs
-                value={primaryLibraryMode(libraryPreferences)}
-                onValueChange={(value) => {
-                  if (value !== "papers" && value !== "books") return;
-                  void updateLibraryPreferences({ primaryMode: value }).catch(
-                    (error) => toast.error((error as Error).message),
-                  );
-                }}
-              >
-                <TabsList
-                  aria-labelledby="primary-library-label"
-                  className="w-full"
+              <div className="flex items-center justify-between gap-3">
+                <h3
+                  id="primary-library-label"
+                  className="shrink-0 text-sm font-medium"
                 >
-                  {(Object.keys(libraryModes) as LibraryMode[]).map((mode) => (
-                    <TabsTrigger key={mode} value={mode}>
-                      {libraryModes[mode].label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+                  主要模式
+                </h3>
+                <Tabs
+                  className="min-w-0"
+                  value={primaryLibraryMode(libraryPreferences)}
+                  onValueChange={(value) => {
+                    if (value !== "papers" && value !== "books") return;
+                    void updateLibraryPreferences({ primaryMode: value }).catch(
+                      (error) => toast.error((error as Error).message),
+                    );
+                  }}
+                >
+                  <TabsList
+                    aria-labelledby="primary-library-label"
+                    className="w-full"
+                  >
+                    {(Object.keys(libraryModes) as LibraryMode[]).map(
+                      (mode) => (
+                        <TabsTrigger key={mode} value={mode}>
+                          {libraryModes[mode].label}
+                        </TabsTrigger>
+                      ),
+                    )}
+                  </TabsList>
+                </Tabs>
+              </div>
               <p className="mt-2 text-xs text-muted-foreground">
                 下次启动时默认进入此模式。
               </p>
             </section>
-            <section>
-              <h3 className="mb-3 text-sm font-medium">界面主题</h3>
-              <AppearancePicker theme={theme} setTheme={setTheme} />
+            <section className="flex items-start justify-between gap-3">
+              <h3 className="flex h-8 shrink-0 items-center text-sm font-medium">
+                界面主题
+              </h3>
+              <div className="min-w-0">
+                <AppearancePicker theme={theme} setTheme={setTheme} />
+              </div>
             </section>
             <section>
-              <h3 className="mb-3 text-sm font-medium">动态效果</h3>
               <div className="flex items-center justify-between gap-3">
-                <label htmlFor="motion-enabled" className="text-sm">
-                  开启动画
-                </label>
+                <h3 id="motion-label" className="text-sm font-medium">
+                  动态效果
+                </h3>
                 <Switch
                   id="motion-enabled"
+                  aria-labelledby="motion-label"
                   checked={theme.reducedMotion !== true}
                   onCheckedChange={(enabled) =>
                     setTheme({ reducedMotion: !enabled })
@@ -949,36 +958,38 @@ export function Settings({
           </TabsContent>
           <TabsContent value="reading" className="settings-panel" keepMounted>
             <section>
-              <h3
-                id="document-context-label"
-                className="mb-3 text-sm font-medium"
-              >
-                文档上下文上限
-              </h3>
-              <Input
-                aria-labelledby="document-context-label"
-                className="max-w-48"
-                type="number"
-                min={8192}
-                max={1048576}
-                step={1024}
-                defaultValue={theme.documentContextTokens || ""}
-                placeholder="自动获取"
-                key={theme.documentContextTokens}
-                onBlur={(e) => {
-                  const n = Number(e.currentTarget.value);
-                  if (
-                    Number.isInteger(n) &&
-                    (n === 0 || n >= 8192) &&
-                    n <= 1048576
-                  )
-                    setTheme({ documentContextTokens: n });
-                  else
-                    e.currentTarget.value = String(
-                      theme.documentContextTokens || "",
-                    );
-                }}
-              />
+              <div className="flex items-center justify-between gap-3">
+                <h3
+                  id="document-context-label"
+                  className="min-w-0 text-sm font-medium"
+                >
+                  文档上下文上限
+                </h3>
+                <Input
+                  aria-labelledby="document-context-label"
+                  className="w-48 shrink-0"
+                  type="number"
+                  min={8192}
+                  max={1048576}
+                  step={1024}
+                  defaultValue={theme.documentContextTokens || ""}
+                  placeholder="自动获取"
+                  key={theme.documentContextTokens}
+                  onBlur={(e) => {
+                    const n = Number(e.currentTarget.value);
+                    if (
+                      Number.isInteger(n) &&
+                      (n === 0 || n >= 8192) &&
+                      n <= 1048576
+                    )
+                      setTheme({ documentContextTokens: n });
+                    else
+                      e.currentTarget.value = String(
+                        theme.documentContextTokens || "",
+                      );
+                  }}
+                />
+              </div>
               <p className="mt-2 text-xs text-muted-foreground">
                 优先读取模型信息或 Codex 配置；留空为自动，未知时采用
                 64K。填写后只限制上限。
