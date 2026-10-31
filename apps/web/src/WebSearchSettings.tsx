@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { WebSearchConfig } from "@neoread/core";
 import { Button } from "@neoread/ui/components/button";
-import { Checkbox } from "@neoread/ui/components/checkbox";
+import { Switch } from "@neoread/ui/components/switch";
 import { Input } from "@neoread/ui/components/input";
 import { Tabs, TabsList, TabsTrigger } from "@neoread/ui/components/tabs";
 
@@ -55,7 +55,7 @@ export function WebSearchSettings({
   }, [value?.url]);
 
   // Serialize patches against the last accepted configuration, so a blur save
-  // and a checkbox click cannot overwrite one another or reuse a stale key.
+  // and a switch click cannot overwrite one another or reuse a stale key.
   const persist = (change: (latest: WebSearchConfig) => WebSearchConfig) => {
     setPending((n) => n + 1);
     const task = queue.current.then(async () => {
@@ -121,13 +121,13 @@ export function WebSearchSettings({
         联网搜索
       </h3>
       <div className="space-y-3">
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox
+        <label className="flex items-center justify-between gap-4 text-sm">
+          <span>允许 CLI 原生联网搜索</span>
+          <Switch
             checked={cliEnabled}
             disabled={disabled}
             onCheckedChange={(checked) => saveCLI(checked === true)}
           />
-          允许 CLI 原生联网搜索
         </label>
         <p className="text-xs leading-5 text-muted-foreground">
           目前支持 Codex，使用 CLI 自身的联网能力。

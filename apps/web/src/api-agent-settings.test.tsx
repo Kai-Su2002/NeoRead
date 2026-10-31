@@ -297,13 +297,12 @@ it("keeps selection auto-copy opt-in and lets reading settings toggle it", async
     const label = [...host.querySelectorAll("label")].find((node) =>
       node.textContent?.includes("自动复制选中文字"),
     )!;
-    const checkbox =
-      label.querySelector<HTMLButtonElement>('[role="checkbox"]')!;
-    expect(checkbox.getAttribute("aria-checked")).toBe("false");
-    await act(async () => checkbox.click());
+    const toggle = label.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    await act(async () => toggle.click());
     expect(useReaderStore.getState().theme.autoCopySelection).toBe(true);
-    expect(checkbox.getAttribute("aria-checked")).toBe("true");
-    await act(async () => checkbox.click());
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    await act(async () => toggle.click());
     expect(useReaderStore.getState().theme.autoCopySelection).toBe(false);
   } finally {
     await act(async () => useReaderStore.setState({ theme: previous }));
@@ -409,16 +408,16 @@ it.each(["text", "vision"] as const)(
   },
 );
 
-it("persists CLI web search directly from the checkbox without a Save action", async () => {
+it("persists CLI web search directly from the toggle without a Save action", async () => {
   await act(async () => root.render(<Settings open onOpenChange={() => {}} />));
   const label = [...host.querySelectorAll("label")].find((node) =>
     node.textContent?.includes("允许 CLI 原生联网搜索"),
   )!;
-  const checkbox = label.querySelector<HTMLButtonElement>('[role="checkbox"]')!;
-  await act(async () => checkbox.click());
+  const toggle = label.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  await act(async () => toggle.click());
   expect(
     vi.mocked(api.saveAIConfig).mock.lastCall?.[0].webSearch?.cliEnabled,
   ).toBe(true);
   expect(useReaderStore.getState().aiConfig?.webSearch?.cliEnabled).toBe(true);
-  expect(checkbox.getAttribute("aria-checked")).toBe("true");
+  expect(toggle.getAttribute("aria-checked")).toBe("true");
 });

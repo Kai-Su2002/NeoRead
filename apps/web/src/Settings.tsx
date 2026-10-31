@@ -1,3 +1,4 @@
+import { Switch } from "@neoread/ui/components/switch";
 import { PaperServiceSettings } from "./papers/PaperServiceSettings";
 import { AutoTranslationSettings } from "./papers/AutoTranslationSettings";
 import { TranslationPromptSettings } from "./TranslationPromptSettings";
@@ -772,21 +773,19 @@ export function Settings({
               <AppearancePicker theme={theme} setTheme={setTheme} />
             </section>
             <section>
-              <h3 id="motion-label" className="mb-3 text-sm font-medium">
-                动态效果
-              </h3>
-              <Tabs
-                value={theme.reducedMotion === true ? "reduced" : "enabled"}
-                onValueChange={(value) => {
-                  if (value === "enabled" || value === "reduced")
-                    setTheme({ reducedMotion: value === "reduced" });
-                }}
-              >
-                <TabsList aria-labelledby="motion-label" className="w-full">
-                  <TabsTrigger value="enabled">开启动画</TabsTrigger>
-                  <TabsTrigger value="reduced">减少动画</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <h3 className="mb-3 text-sm font-medium">动态效果</h3>
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="motion-enabled" className="text-sm">
+                  开启动画
+                </label>
+                <Switch
+                  id="motion-enabled"
+                  checked={theme.reducedMotion !== true}
+                  onCheckedChange={(enabled) =>
+                    setTheme({ reducedMotion: !enabled })
+                  }
+                />
+              </div>
             </section>
             <section>
               <fieldset>
@@ -826,21 +825,21 @@ export function Settings({
             </section>
             <section>
               <h3 className="mb-3 text-sm font-medium">期刊指标</h3>
-              <label className="flex items-start gap-2 text-sm">
-                <Checkbox
-                  className="mt-0.5"
-                  checked={journalRank?.enabled ?? true}
-                  disabled={!journalRank || journalSaving}
-                  onCheckedChange={(checked) =>
-                    void saveJournalRank({ enabled: !!checked })
-                  }
-                />
+              <label className="flex items-center justify-between gap-4 text-sm">
                 <span>
                   在论文库显示 easyScholar 期刊指标
                   <span className="block text-xs text-muted-foreground">
                     默认开启；配置 SecretKey 后按论文出处查询。
                   </span>
                 </span>
+                <Switch
+                  aria-label="在论文库显示 easyScholar 期刊指标"
+                  checked={journalRank?.enabled ?? true}
+                  disabled={!journalRank || journalSaving}
+                  onCheckedChange={(checked) =>
+                    void saveJournalRank({ enabled: !!checked })
+                  }
+                />
               </label>
               {journalRank?.enabled && (
                 <>
@@ -985,47 +984,50 @@ export function Settings({
             </section>
             <section className="space-y-4">
               <h3 className="text-sm font-medium">阅读交互</h3>
-              <label className="flex items-start gap-2 text-sm">
-                <Checkbox
-                  checked={theme.documentTabs === true}
-                  onCheckedChange={(checked) =>
-                    setTheme({ documentTabs: !!checked })
-                  }
-                />
+              <label className="flex items-center justify-between gap-4 text-sm">
                 <span>
                   多文档标签页
                   <span className="block text-xs text-muted-foreground">
                     在标签页中同时打开多份文档，切换时保留阅读位置和对话；关闭后打开文档会替换当前文档
                   </span>
                 </span>
-              </label>
-              <label className="flex items-start gap-2 text-sm">
-                <Checkbox
-                  checked={theme.autoCopySelection === true}
+                <Switch
+                  aria-label="多文档标签页"
+                  checked={theme.documentTabs === true}
                   onCheckedChange={(checked) =>
-                    setTheme({ autoCopySelection: !!checked })
+                    setTheme({ documentTabs: !!checked })
                   }
                 />
+              </label>
+              <label className="flex items-center justify-between gap-4 text-sm">
                 <span>
                   自动复制选中文字
                   <span className="block text-xs text-muted-foreground">
                     选中文字或点击高亮、划线等批注时，自动复制到剪贴板
                   </span>
                 </span>
-              </label>
-              <label className="flex items-start gap-2 text-sm">
-                <Checkbox
-                  checked={theme.linkTranslationAnnotations !== false}
+                <Switch
+                  aria-label="自动复制选中文字"
+                  checked={theme.autoCopySelection === true}
                   onCheckedChange={(checked) =>
-                    setTheme({ linkTranslationAnnotations: !!checked })
+                    setTheme({ autoCopySelection: !!checked })
                   }
                 />
+              </label>
+              <label className="flex items-center justify-between gap-4 text-sm">
                 <span>
                   原文译文悬停关联
                   <span className="block text-xs text-muted-foreground">
                     悬停时提示另一侧对应的完整句子
                   </span>
                 </span>
+                <Switch
+                  aria-label="原文译文悬停关联"
+                  checked={theme.linkTranslationAnnotations !== false}
+                  onCheckedChange={(checked) =>
+                    setTheme({ linkTranslationAnnotations: !!checked })
+                  }
+                />
               </label>
             </section>
             <section>
@@ -1039,9 +1041,15 @@ export function Settings({
             <CitePluginSettings open={open} />
             <section>
               <h3 className="mb-3 text-sm font-medium">显示设置</h3>
-              <label className="flex items-start gap-2 text-sm">
-                <Checkbox
-                  className="mt-0.5"
+              <label className="flex items-center justify-between gap-4 text-sm">
+                <span>
+                  论文显示作者名字
+                  <span className="block text-xs text-muted-foreground">
+                    在表格和卡片中的标题下方显示
+                  </span>
+                </span>
+                <Switch
+                  aria-label="论文显示作者名字"
                   checked={paperPreferences.showAuthors !== false}
                   onCheckedChange={(checked) =>
                     void updateLibraryPreferences({
@@ -1049,26 +1057,11 @@ export function Settings({
                     }).catch((e) => toast.error(e.message))
                   }
                 />
-                <span>
-                  论文显示作者名字
-                  <span className="block text-xs text-muted-foreground">
-                    在表格和卡片中的标题下方显示
-                  </span>
-                </span>
               </label>
             </section>
             <section>
               <h3 className="mb-3 text-sm font-medium">导入设置</h3>
-              <label className="flex items-start gap-2 text-sm">
-                <Checkbox
-                  className="mt-0.5"
-                  checked={paperPreferences.autoLookup !== false}
-                  onCheckedChange={(checked) =>
-                    void updateLibraryPreferences({
-                      papers: { ...paperPreferences, autoLookup: !!checked },
-                    }).catch((e) => toast.error(e.message))
-                  }
-                />
+              <label className="flex items-center justify-between gap-4 text-sm">
                 <span>
                   导入 PDF 后自动补全论文信息
                   <span className="block text-xs text-muted-foreground">
@@ -1076,21 +1069,30 @@ export function Settings({
                     Scholar 查询
                   </span>
                 </span>
-              </label>
-              <label className="mt-4 flex items-start gap-2 text-sm">
-                <Checkbox
-                  className="mt-0.5"
-                  checked={theme.autoGenerateOverview ?? false}
+                <Switch
+                  aria-label="导入 PDF 后自动补全论文信息"
+                  checked={paperPreferences.autoLookup !== false}
                   onCheckedChange={(checked) =>
-                    setTheme({ autoGenerateOverview: !!checked })
+                    void updateLibraryPreferences({
+                      papers: { ...paperPreferences, autoLookup: !!checked },
+                    }).catch((e) => toast.error(e.message))
                   }
                 />
+              </label>
+              <label className="mt-4 flex items-center justify-between gap-4 text-sm">
                 <span>
                   导入后生成文档概要
                   <span className="block text-xs text-muted-foreground">
                     使用已配置的文字模型，单独记录用量；已有文档按需生成。
                   </span>
                 </span>
+                <Switch
+                  aria-label="导入后生成文档概要"
+                  checked={theme.autoGenerateOverview ?? false}
+                  onCheckedChange={(checked) =>
+                    setTheme({ autoGenerateOverview: !!checked })
+                  }
+                />
               </label>
               <AutoTranslationSettings theme={theme} setTheme={setTheme} />
             </section>
