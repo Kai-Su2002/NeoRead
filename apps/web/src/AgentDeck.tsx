@@ -582,7 +582,7 @@ export function AgentDeck({
               data-spread={(spread && !panel) || undefined}
               style={{
                 width: Math.min(origin.width, window.innerWidth - 48),
-                ["--deck-edge" as string]: `${(n * step) / 2 - 56}px`,
+                ["--deck-edge" as string]: `${(n * step) / 2 - 24}px`,
               }}
               onKeyDown={keys}
             >
