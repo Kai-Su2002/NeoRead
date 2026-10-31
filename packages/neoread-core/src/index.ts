@@ -373,6 +373,8 @@ export interface ReaderTheme {
   readingSession?: { documentIds: string[]; activeId: string | null };
   /** Open documents in tabs; otherwise opening one replaces the current document. */
   documentTabs?: boolean;
+  /** App-controlled motion preference; independent of the operating system. */
+  reducedMotion?: boolean;
   readerLayout?: Partial<ReaderLayout>;
   /** Opt in to copying text selections and selected annotations. */
   autoCopySelection?: boolean;
@@ -420,6 +422,7 @@ export interface HighlightColor {
 }
 export const defaultTheme: ReaderTheme = {
   documentTabs: false,
+  reducedMotion: false,
   autoCopySelection: false,
   autoTranslatePDF: true,
   pdfDarkImageMode: "adaptive",

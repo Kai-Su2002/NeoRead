@@ -1,3 +1,4 @@
+import { reducedMotion } from "./motion";
 import {
   useEffect,
   useRef,
@@ -44,9 +45,6 @@ export interface DeckItem {
 
 const visible = 2;
 const settleDelay = 1000;
-
-const reducedMotion = () =>
-  !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 function useSettled(passed: boolean) {
   const [settled, setSettled] = useState(passed);

@@ -1,3 +1,4 @@
+import { reducedMotion } from "../motion";
 /** Hover uses small composited layers; never animate inherited reader styles. */
 export class SentenceHover {
   private key = "";
@@ -16,10 +17,7 @@ export class SentenceHover {
     layer.remove();
   }
   private fade(layer: HTMLDivElement, entering: boolean) {
-    if (
-      !layer.animate ||
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-    ) {
+    if (!layer.animate || reducedMotion()) {
       if (!entering) this.remove(layer);
       return;
     }

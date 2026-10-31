@@ -5,9 +5,12 @@ import { installCloseFlush } from "./close-flush";
 import { AppCrash, ErrorBoundary } from "./ErrorBoundary";
 import "./style.css";
 import { installDiagnostics } from "./diagnostics";
+import { installMotionPreference } from "./motion";
 import { installScrollbars } from "./scrollbars";
 import { migrateReaderPreferences } from "./legacy-preferences";
 migrateReaderPreferences();
+const removeMotion = installMotionPreference(document);
+if (import.meta.hot) import.meta.hot.dispose(removeMotion);
 const removeScrollbars = installScrollbars(document);
 if (import.meta.hot) import.meta.hot.dispose(removeScrollbars);
 const token =

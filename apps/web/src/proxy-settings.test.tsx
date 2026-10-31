@@ -31,21 +31,11 @@ const type = async (label: string, value: string) =>
 const render = async (open = true) =>
   act(async () => root.render(<ProxySettings open={open} />));
 const chooseMode = async (label: string) => {
-  await act(async () =>
-    (
-      host.querySelector(
-        '[aria-labelledby="proxy-mode-label"]',
-      ) as HTMLButtonElement
-    ).click(),
-  );
-  const option = Array.from(document.querySelectorAll('[role="option"]')).find(
-    (element) => element.textContent === label,
-  ) as HTMLElement;
-  expect(option).toBeDefined();
-  await act(async () => {
-    option.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
-    option.click();
-  });
+  const tab = Array.from(
+    host.querySelectorAll<HTMLElement>('[role="tab"]'),
+  ).find((element) => element.textContent === label);
+  expect(tab).toBeDefined();
+  await act(async () => tab!.click());
 };
 
 beforeEach(() => {
@@ -263,7 +253,7 @@ it("shows system-reading warnings in settings and is absent in the web app", asy
   expect(host.textContent).toBe("");
 });
 
-it("switches between system, manual and direct modes using the real select", async () => {
+it("switches between system, manual and direct modes using the real tabs", async () => {
   state = { settings: { mode: "system" }, restartRequired: false };
   await render();
   expect(input("代理地址")).toBeNull();

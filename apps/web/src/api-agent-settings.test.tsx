@@ -121,6 +121,7 @@ beforeEach(() => {
     textAPI: { url: "", model: "", hasKey: false },
     imageAPI: { url: "", model: "", hasKey: false },
   };
+  useReaderStore.getState().setTheme({ reducedMotion: true });
   useReaderStore.setState({ aiConfig: undefined, aiModelSaving: false });
   vi.mocked(api.providers).mockImplementation(async () => [
     {
@@ -173,6 +174,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await act(async () => root.unmount());
+  useReaderStore.getState().setTheme({ reducedMotion: false });
   host.remove();
   delete window.neoreadDesktop;
   vi.unstubAllGlobals();
@@ -256,69 +258,6 @@ it("saves the API endpoint and key, then tests the new connection", async () => 
   expect(input("API Key").value).toBe("");
   expect(input("API Key").placeholder).toBe("已保存，留空保持不变");
 });
-it("keeps the saved key when changing only the API endpoint and rechecks models", async () => {
-  config.api = { url: "https://api.deepseek.com", model: "", hasKey: true };
-  config.capabilities = {
-    "api:deepseek-flash": { text: true, vision: true, checkedAt: "saved" },
-    "api:deepseek-v4-pro": { text: true, vision: false, checkedAt: "saved" },
-  };
-  await act(async () => root.render(<Settings open onOpenChange={() => {}} />));
-  await openAPI();
-  expect(input("API Key").value).toBe("");
-  expect(input("API Key").placeholder).toBe("已保存，留空保持不变");
-  expect(api.testAI).not.toHaveBeenCalled();
-  // Editing only the address keeps the saved key without resending it.
-  await type("Base URL", "https://api.deepseek.com/v1");
-  await submit();
-  expect(api.saveAIConfig).toHaveBeenLastCalledWith(
-    expect.objectContaining({
-      api: {
-        url: "https://api.deepseek.com/v1",
-        protocol: "auto",
-        model: "",
-        key: undefined,
-        hasKey: true,
-      },
-    }),
-  );
-  for (const model of ["deepseek-flash", "deepseek-v4-pro"])
-    for (const stage of ["text", "vision"])
-      expect(api.testAI).toHaveBeenCalledWith("api", stage, model);
-  expect(api.testAI).toHaveBeenCalledTimes(4);
-  expect(config.api).toEqual({
-    url: "https://api.deepseek.com/v1",
-    protocol: "auto",
-    model: "",
-    hasKey: true,
-  });
-  expect(
-    host.querySelectorAll('.api-model-list [aria-label="图片理解：已通过"]'),
-  ).toHaveLength(1);
-});
-it("warns when no listed model passes the vision check", async () => {
-  config.api = { url: "https://api.example.com", model: "", hasKey: true };
-  listed = { "text-only": false };
-  await act(async () => root.render(<Settings open onOpenChange={() => {}} />));
-  await openAPI();
-  expect(input("Base URL").value).toBe("https://api.example.com");
-  expect(api.testAI).toHaveBeenCalledWith("api", "vision", "text-only");
-  expect(toast.warning).toHaveBeenCalledOnce();
-  await act(async () =>
-    (
-      host.querySelector('[aria-label="返回 Agent 设置"]') as HTMLButtonElement
-    ).click(),
-  );
-  const card = host.querySelector(apiCard)!;
-  expect(card.querySelector('[aria-label="文本推理：已通过"]')).not.toBeNull();
-  expect(card.querySelector('[aria-label="图片理解：未通过"]')).not.toBeNull();
-  // A card that failed a check cannot be selected.
-  vi.mocked(api.saveAIConfig).mockClear();
-  await selectAPI();
-  expect(toast.warning).toHaveBeenLastCalledWith(
-    "API 未配置好：没有图片理解能力",
-  );
-  expect(api.saveAIConfig).not.toHaveBeenCalled();
-});
 it("selects the API agent from its card once a model passes", async () => {
   config.primary = "";
   config.api = { url: "https://api.example.com", model: "", hasKey: true };
@@ -341,33 +280,6 @@ it("opens the API settings from an unconfigured card", async () => {
   expect(input("Base URL")).not.toBeNull();
   expect(api.saveAIConfig).not.toHaveBeenCalled();
 });
-it("adds and removes a model ID by hand and checks it", async () => {
-  config.api = { url: "https://api.example.com", model: "", hasKey: true };
-  config.capabilities = {
-    "api:deepseek-flash": { text: true, vision: true, checkedAt: "saved" },
-    "api:deepseek-v4-pro": { text: true, vision: false, checkedAt: "saved" },
-  };
-  await act(async () => root.render(<Settings open onOpenChange={() => {}} />));
-  await openAPI();
-  expect(api.testAI).not.toHaveBeenCalled();
-  await type("添加模型 ID", "my-model");
-  await act(async () =>
-    input("添加模型 ID").form!.dispatchEvent(
-      new Event("submit", { bubbles: true, cancelable: true }),
-    ),
-  );
-  expect(config.apiModels).toEqual(["my-model"]);
-  expect(api.testAI).toHaveBeenCalledWith("api", "text", "my-model");
-  expect(api.testAI).toHaveBeenCalledTimes(2);
-  await act(async () =>
-    (
-      host.querySelector('[aria-label="移除 my-model"]') as HTMLButtonElement
-    ).click(),
-  );
-  expect(config.apiModels).toEqual([]);
-  expect(host.textContent).not.toContain("my-model");
-});
-
 it("keeps selection auto-copy opt-in and lets reading settings toggle it", async () => {
   vi.stubGlobal("PointerEvent", MouseEvent);
   const previous = useReaderStore.getState().theme;

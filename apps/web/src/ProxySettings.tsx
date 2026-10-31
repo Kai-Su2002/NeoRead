@@ -7,13 +7,7 @@ import type {
 import { LoaderCircle, CircleCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@neoread/ui/components/button";
 import { Input } from "@neoread/ui/components/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@neoread/ui/components/select";
+import { Tabs, TabsList, TabsTrigger } from "@neoread/ui/components/tabs";
 
 const labels = { system: "跟随系统", manual: "手动 HTTP 代理", direct: "直连" };
 
@@ -108,9 +102,8 @@ export function ProxySettings({ open }: { open: boolean }) {
         <h3 id="proxy-mode-label" className="mb-3 text-sm font-medium">
           代理
         </h3>
-        <Select
+        <Tabs
           value={mode}
-          disabled={pending || !state}
           onValueChange={(value) => {
             if (
               value === "manual" ||
@@ -122,17 +115,18 @@ export function ProxySettings({ open }: { open: boolean }) {
             }
           }}
         >
-          <SelectTrigger aria-labelledby="proxy-mode-label" className="w-48">
-            <SelectValue>{labels[mode]}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
+          <TabsList aria-labelledby="proxy-mode-label" className="w-full">
             {Object.entries(labels).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
+              <TabsTrigger
+                key={value}
+                value={value}
+                disabled={pending || !state}
+              >
                 {label}
-              </SelectItem>
+              </TabsTrigger>
             ))}
-          </SelectContent>
-        </Select>
+          </TabsList>
+        </Tabs>
         {mode === "manual" && (
           <div className="mt-3 flex gap-3">
             <label className="min-w-0 flex-1 text-xs text-muted-foreground">

@@ -119,7 +119,7 @@
   animation: none !important;
   opacity: 1 !important;
 }
-@media (prefers-reduced-motion: reduce) {
+:root[data-reduced-motion="true"] {
   .message-markdown .stream-char,
   .message-markdown .stream-block {
     animation: none !important;

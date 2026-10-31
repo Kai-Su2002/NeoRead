@@ -99,6 +99,7 @@ vi.mock("../ReaderView", () => ({
     return <div>EPUB 原文</div>;
   },
 }));
+import { useReaderStore } from "../store";
 import { EPUBReadingView } from "./EPUBReadingView";
 const blocks: import("@neoread/core").EPUBReadingBlock[] = [
   "a.xhtml",
@@ -176,6 +177,7 @@ async function renderView(theme: ReaderTheme = defaultTheme) {
 
 afterEach(async () => {
   await act(async () => root.unmount());
+  useReaderStore.getState().setTheme({ reducedMotion: false });
   host.remove();
   window.getSelection()?.removeAllRanges();
   vi.clearAllMocks();
@@ -437,11 +439,7 @@ it("links block hover and focuses a clicked block in both panes", async () => {
   );
   expect(adapter.hoverBlock).toHaveBeenLastCalledWith("e-b");
   vi.mocked(adapter.goTo).mockClear();
-  vi.stubGlobal("matchMedia", () => ({
-    matches: true,
-    addEventListener() {},
-    removeEventListener() {},
-  }));
+  useReaderStore.getState().setTheme({ reducedMotion: true });
   await act(async () => fixture.events!.epubBlockFocus?.("e-b"));
   expect(adapter.focusBlock).toHaveBeenCalledWith("e-b", "parallel");
   // Centered: 600 - (400 - 100) / 2.

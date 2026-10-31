@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+import { useReaderStore } from "./store";
 import { act, type ReactNode, type WheelEventHandler } from "react";
 import { createRoot } from "react-dom/client";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { AgentDeck, type DeckItem } from "./AgentDeck";
 
 vi.mock("@neoread/ui/components/dialog", () => ({
@@ -23,7 +24,7 @@ vi.mock("@neoread/ui/components/dialog", () => ({
 
 it("centres a focused guide target without selecting the provider", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  vi.stubGlobal("matchMedia", () => ({ matches: true }));
+  useReaderStore.getState().setTheme({ reducedMotion: true });
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -82,7 +83,7 @@ it("centres a focused guide target without selecting the provider", async () => 
 async function scrollDeck(delta: number, reduced = false, reverse = false) {
   vi.useFakeTimers();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  vi.stubGlobal("matchMedia", () => ({ matches: reduced }));
+  useReaderStore.getState().setTheme({ reducedMotion: reduced });
   let now = 0;
   let sequence = 0;
   const frames = new Map<number, FrameRequestCallback>();
@@ -200,3 +201,5 @@ it("keeps wheel navigation immediate with reduced motion", async () => {
   expect(reduced.coasting).toBe(reduced.during);
   expect(reduced.settled).toBe(reduced.during);
 });
+
+afterEach(() => useReaderStore.getState().setTheme({ reducedMotion: false }));

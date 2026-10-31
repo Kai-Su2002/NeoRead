@@ -3,13 +3,7 @@ import type { WebSearchConfig } from "@neoread/core";
 import { Button } from "@neoread/ui/components/button";
 import { Checkbox } from "@neoread/ui/components/checkbox";
 import { Input } from "@neoread/ui/components/input";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@neoread/ui/components/select";
+import { Tabs, TabsList, TabsTrigger } from "@neoread/ui/components/tabs";
 
 const defaultURL = "https://api.deepseek.com";
 const defaults: WebSearchConfig = {
@@ -142,25 +136,22 @@ export function WebSearchSettings({
           <label id={`${id}-provider`} className="text-sm">
             搜索 API
           </label>
-          <Select
+          <Tabs
             value={provider || "off"}
-            disabled={disabled}
             onValueChange={(next) => {
               if (next === "off" || next === "deepseek")
                 saveProvider(next === "off" ? "" : next);
             }}
           >
-            <SelectTrigger
-              aria-labelledby={`${id}-provider`}
-              className="w-full"
-            >
-              <SelectValue>{provider ? "DeepSeek" : "关闭"}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="off">关闭</SelectItem>
-              <SelectItem value="deepseek">DeepSeek</SelectItem>
-            </SelectContent>
-          </Select>
+            <TabsList aria-labelledby={`${id}-provider`} className="w-full">
+              <TabsTrigger value="off" disabled={disabled}>
+                关闭
+              </TabsTrigger>
+              <TabsTrigger value="deepseek" disabled={disabled}>
+                DeepSeek
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
           {provider && (
             <>
               <label htmlFor={`${id}-url`} className="text-sm">

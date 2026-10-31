@@ -49,13 +49,6 @@ import {
 } from "@neoread/ui/components/dialog";
 import { Badge } from "@neoread/ui/components/badge";
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@neoread/ui/components/select";
-import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
@@ -750,7 +743,7 @@ export function Settings({
               >
                 主要模式
               </h3>
-              <Select
+              <Tabs
                 value={primaryLibraryMode(libraryPreferences)}
                 onValueChange={(value) => {
                   if (value !== "papers" && value !== "books") return;
@@ -759,29 +752,41 @@ export function Settings({
                   );
                 }}
               >
-                <SelectTrigger
+                <TabsList
                   aria-labelledby="primary-library-label"
-                  className="w-48"
+                  className="w-full"
                 >
-                  <SelectValue>
-                    {libraryModes[primaryLibraryMode(libraryPreferences)].label}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
                   {(Object.keys(libraryModes) as LibraryMode[]).map((mode) => (
-                    <SelectItem key={mode} value={mode}>
+                    <TabsTrigger key={mode} value={mode}>
                       {libraryModes[mode].label}
-                    </SelectItem>
+                    </TabsTrigger>
                   ))}
-                </SelectContent>
-              </Select>
+                </TabsList>
+              </Tabs>
               <p className="mt-2 text-xs text-muted-foreground">
                 下次启动时默认进入此模式。
               </p>
             </section>
             <section>
               <h3 className="mb-3 text-sm font-medium">界面主题</h3>
-              <AppearancePicker theme={theme} setTheme={setTheme} buttons />
+              <AppearancePicker theme={theme} setTheme={setTheme} />
+            </section>
+            <section>
+              <h3 id="motion-label" className="mb-3 text-sm font-medium">
+                动态效果
+              </h3>
+              <Tabs
+                value={theme.reducedMotion === true ? "reduced" : "enabled"}
+                onValueChange={(value) => {
+                  if (value === "enabled" || value === "reduced")
+                    setTheme({ reducedMotion: value === "reduced" });
+                }}
+              >
+                <TabsList aria-labelledby="motion-label" className="w-full">
+                  <TabsTrigger value="enabled">开启动画</TabsTrigger>
+                  <TabsTrigger value="reduced">减少动画</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </section>
             <section>
               <fieldset>
@@ -864,8 +869,9 @@ export function Settings({
                   </div>
                   <div className="mt-4 flex items-center gap-2 text-xs">
                     <span id="journal-rank-filter-label">指标筛选</span>
-                    <Select
+                    <Tabs
                       value={journalRank.filterMode}
+                      className="min-w-0 flex-1"
                       onValueChange={(value) => {
                         if (value !== "include" && value !== "exclude") return;
                         void saveJournalRank({
@@ -876,25 +882,19 @@ export function Settings({
                               : [],
                         });
                       }}
-                      disabled={journalSaving}
                     >
-                      <SelectTrigger
+                      <TabsList
                         aria-labelledby="journal-rank-filter-label"
-                        className="w-48"
+                        className="w-full"
                       >
-                        <SelectValue>
-                          {journalRank.filterMode === "include"
-                            ? "只显示选中的指标"
-                            : "隐藏选中的指标"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="include">
+                        <TabsTrigger value="include" disabled={journalSaving}>
                           只显示选中的指标
-                        </SelectItem>
-                        <SelectItem value="exclude">隐藏选中的指标</SelectItem>
-                      </SelectContent>
-                    </Select>
+                        </TabsTrigger>
+                        <TabsTrigger value="exclude" disabled={journalSaving}>
+                          隐藏选中的指标
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     {journalRank.filterMode === "include"

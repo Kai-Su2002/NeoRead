@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useReaderStore } from "../store";
 import { ReadingLinkNavigation } from "../reading-links";
 import { act, useContext, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -204,6 +205,7 @@ it("retains PDF.js search on pages without parsed blocks", async () => {
 
 afterEach(async () => {
   await act(async () => root.unmount());
+  useReaderStore.getState().setTheme({ reducedMotion: false });
   host.remove();
   window.getSelection()?.removeAllRanges();
   vi.clearAllMocks();
@@ -826,7 +828,7 @@ it("centers both panels from a source click and recalculates a focused translati
 it.each([false, true])(
   "restores the reading anchor after the translation pane expands without passage focus (reduced motion: %s)",
   async (reduced) => {
-    vi.stubGlobal("matchMedia", () => ({ matches: reduced }));
+    useReaderStore.getState().setTheme({ reducedMotion: reduced });
     await renderView(defaultTheme, [
       {
         id: "p1-b2",

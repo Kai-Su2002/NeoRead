@@ -1,3 +1,4 @@
+import { useReducedMotion } from "../motion";
 import { Button } from "@neoread/ui/components/button";
 import { copyText } from "./clipboard";
 import { Copy } from "lucide-react";
@@ -172,20 +173,7 @@ const components: Components = {
     </div>
   ),
 };
-export function useMotionPreference() {
-  const [reduced, setReduced] = useState(
-    () =>
-      typeof matchMedia !== "undefined" &&
-      matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
-  useEffect(() => {
-    const media = matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(media.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-  return reduced;
-}
+export const useMotionPreference = useReducedMotion;
 const markdownOptions = {
   remarkPlugins: plugins,
   components,

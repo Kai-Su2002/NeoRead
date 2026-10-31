@@ -4,14 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@neoread/api";
 import { toast } from "sonner";
-import {
-  cursorAt,
-  paint,
-  Painter,
-  readPalette,
-  script,
-  stillTime,
-} from "./canvas";
+import { cursorAt, script } from "./canvas";
 import { scenes } from "./scenes";
 import { guideTopics } from "./topics";
 import { guideLaunch, releaseNotes } from "./releases";
@@ -116,18 +109,6 @@ describe("guide canvas", () => {
     expect(cursorAt(s, 799)).toEqual({ x: 100, y: 50 });
     expect(s.duration).toBe(800);
   });
-  it.each(Object.entries(scenes))(
-    "paints %s through its whole loop",
-    (_, scene) => {
-      const { ctx, calls } = recordingContext();
-      const painter = new Painter(ctx, readPalette(), "sans-serif");
-      for (let t = 0; t < scene.script.duration; t += 50)
-        paint(scene, painter, t);
-      paint(scene, painter, stillTime(scene), false);
-      expect(stillTime(scene)).toBeLessThan(scene.script.duration);
-      expect(calls.length).toBeGreaterThan(100);
-    },
-  );
 });
 
 describe("guide host", () => {

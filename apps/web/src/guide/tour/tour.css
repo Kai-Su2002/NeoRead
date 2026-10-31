@@ -274,7 +274,7 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-reduced-motion="true"] {
   .tour-frame,
   .tour-pointer,
   .tour-card,
