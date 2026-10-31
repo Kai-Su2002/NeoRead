@@ -27,14 +27,7 @@ export function TranslationPromptSettings({
         maxLength={6000}
         rows={4}
         placeholder="例如：用自然流畅的中文翻译，保留关键英文术语。"
-        aria-describedby={`${id}-help`}
       />
-      <p
-        id={`${id}-help`}
-        className="mt-2 text-xs leading-5 text-muted-foreground"
-      >
-        补充翻译风格和术语要求。留空使用默认规则；已完成的译文需重新翻译才会应用。
-      </p>
       <div className="mt-2 flex justify-end gap-2">
         <Button
           variant="ghost"

@@ -801,9 +801,6 @@ export function Settings({
             <section>
               <fieldset>
                 <legend className="mb-1 text-sm font-medium">表格显示列</legend>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  标题始终显示。以下选择应用于论文库的表格视图。
-                </p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   {(Object.keys(columnLabels) as PaperColumn[]).map(
                     (column) => (
@@ -990,20 +987,11 @@ export function Settings({
                   }}
                 />
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                优先读取模型信息或 Codex 配置；留空为自动，未知时采用
-                64K。填写后只限制上限。
-              </p>
             </section>
             <section className="space-y-4">
               <h3 className="text-sm font-medium">阅读交互</h3>
               <label className="flex items-center justify-between gap-4 text-sm">
-                <span>
-                  多文档标签页
-                  <span className="block text-xs text-muted-foreground">
-                    在标签页中同时打开多份文档，切换时保留阅读位置和对话；关闭后打开文档会替换当前文档
-                  </span>
-                </span>
+                <span>多文档标签页</span>
                 <Switch
                   aria-label="多文档标签页"
                   checked={theme.documentTabs === true}
@@ -1013,12 +1001,7 @@ export function Settings({
                 />
               </label>
               <label className="flex items-center justify-between gap-4 text-sm">
-                <span>
-                  自动复制选中文字
-                  <span className="block text-xs text-muted-foreground">
-                    选中文字或点击高亮、划线等批注时，自动复制到剪贴板
-                  </span>
-                </span>
+                <span>自动复制选中文字</span>
                 <Switch
                   aria-label="自动复制选中文字"
                   checked={theme.autoCopySelection === true}
