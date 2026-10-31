@@ -49,11 +49,18 @@ export function PaperRefreshSettings({ open }: { open: boolean }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-medium">
-          重新识别论文标题，并查找论文信息
-        </h3>
+        <div className="min-w-0 flex-1 space-y-2">
+          <h3 className="text-sm font-medium">
+            重新识别论文标题，并查找论文信息
+          </h3>
+          <p className="text-xs leading-5 text-muted-foreground">
+            处理出处为空且标题未手动编辑过的 PDF 论文。AI
+            标题会显示为建议，供你确认。
+          </p>
+        </div>
         <Button
           variant="outline"
+          className="shrink-0"
           disabled={busy || !progress}
           onClick={() => void start()}
         >
@@ -63,10 +70,7 @@ export function PaperRefreshSettings({ open }: { open: boolean }) {
           {busy ? "进行中…" : "开始"}
         </Button>
       </div>
-      <p className="text-xs leading-5 text-muted-foreground">
-        处理出处为空且标题未手动编辑过的 PDF 论文。AI
-        标题会显示为建议，供你确认。
-      </p>
+
       {progress && progress.status !== "idle" && (
         <p role="status" className="text-xs text-muted-foreground">
           {progress.status === "running"
