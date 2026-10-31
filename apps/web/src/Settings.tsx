@@ -771,9 +771,6 @@ export function Settings({
                   </TabsList>
                 </Tabs>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                下次启动时默认进入此模式。
-              </p>
             </section>
             <section className="flex items-start justify-between gap-3">
               <h3 className="flex h-8 shrink-0 items-center text-sm font-medium">

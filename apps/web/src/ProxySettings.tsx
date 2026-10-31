@@ -99,10 +99,10 @@ export function ProxySettings({ open }: { open: boolean }) {
   return (
     <>
       <section>
-        <h3 id="proxy-mode-label" className="mb-3 text-sm font-medium">
-          代理
-        </h3>
         <div className="flex items-center gap-3">
+          <h3 id="proxy-mode-label" className="shrink-0 text-sm font-medium">
+            代理
+          </h3>
           <Tabs
             className="min-w-0 flex-1"
             value={mode}

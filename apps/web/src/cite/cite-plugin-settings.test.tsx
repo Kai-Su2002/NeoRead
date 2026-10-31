@@ -89,7 +89,7 @@ it("keeps the plugin section visible when detection fails and allows retry", asy
     citePlugins: query,
   } as unknown as typeof window.neoreadDesktop;
   await act(async () => root.render(<CitePluginSettings open />));
-  expect(host.textContent).toContain("Word / WPS 引用插件");
+  expect(host.textContent).toContain("引用插件");
   expect(host.querySelector('[role="alert"]')?.textContent).toContain(
     "Word 启动目录配置无效",
   );
@@ -117,7 +117,7 @@ it("ignores an old detection failure after settings reopen", async () => {
     citePlugins: query,
   } as unknown as typeof window.neoreadDesktop;
   await act(async () => root.render(<CitePluginSettings open />));
-  expect(host.textContent).toContain("Word / WPS 引用插件");
+  expect(host.textContent).toContain("引用插件");
   await act(async () => root.render(<CitePluginSettings open={false} />));
   await act(async () => root.render(<CitePluginSettings open />));
   await act(async () => reject(new Error("stale failure")));

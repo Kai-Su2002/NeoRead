@@ -89,7 +89,7 @@ export function CitePluginSettings({ open }: { open: boolean }) {
 
   return (
     <section className="text-sm">
-      <h3 className="mb-3 font-medium">Word / WPS 引用插件</h3>
+      <h3 className="mb-3 font-medium">引用插件</h3>
       <p className="text-xs text-muted-foreground">
         在文档中插入论文库中的引注和参考文献表。使用时需保持 NeoRead 运行。
       </p>
