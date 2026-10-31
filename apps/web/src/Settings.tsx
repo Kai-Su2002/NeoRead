@@ -772,13 +772,12 @@ export function Settings({
                 </Tabs>
               </div>
             </section>
-            <section className="flex items-start justify-between gap-3">
-              <h3 className="flex h-8 shrink-0 items-center text-sm font-medium">
-                界面主题
-              </h3>
-              <div className="min-w-0">
-                <AppearancePicker theme={theme} setTheme={setTheme} />
-              </div>
+            <section>
+              <AppearancePicker
+                theme={theme}
+                setTheme={setTheme}
+                layout="settings"
+              />
             </section>
             <section>
               <div className="flex items-center justify-between gap-3">

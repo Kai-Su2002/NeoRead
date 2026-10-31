@@ -41,41 +41,78 @@ function Choices<T extends string>({
 export function AppearancePicker({
   theme,
   setTheme,
+  layout = "compact",
 }: {
   theme: ReaderTheme;
+  layout?: "compact" | "settings";
   setTheme: (patch: Partial<ReaderTheme>) => void;
 }) {
   const choice = appearanceChoice(theme);
   return (
     <div className="space-y-3">
-      <Choices<AppearanceChoice>
-        label="配色"
-        value={choice}
-        options={appearanceChoices}
-        onChange={(value) => setTheme(chooseAppearance(value))}
-      />
+      <div
+        className={
+          layout === "settings"
+            ? "flex items-center justify-between gap-3"
+            : undefined
+        }
+      >
+        {layout === "settings" && (
+          <h3 className="shrink-0 text-sm font-medium">界面主题</h3>
+        )}
+        <div className={layout === "settings" ? "min-w-0 flex-1" : undefined}>
+          <Choices<AppearanceChoice>
+            label="配色"
+            value={choice}
+            options={appearanceChoices}
+            onChange={(value) => setTheme(chooseAppearance(value))}
+          />
+        </div>
+      </div>
       {choice === "system" && (
-        <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
-          <span className="text-sm text-muted-foreground">系统浅色时</span>
-          <Choices
-            label="系统浅色时的配色"
-            value={theme.systemLightMode ?? "light"}
-            options={[
-              ["light", "浅色"],
-              ["sepia", "纸张"],
-            ]}
-            onChange={(systemLightMode) => setTheme({ systemLightMode })}
-          />
-          <span className="text-sm text-muted-foreground">系统深色时</span>
-          <Choices
-            label="系统深色时的配色"
-            value={theme.systemDarkContrast ?? "soft"}
-            options={[
-              ["soft", "石墨"],
-              ["high", "纯黑"],
-            ]}
-            onChange={(systemDarkContrast) => setTheme({ systemDarkContrast })}
-          />
+        <div
+          className={
+            layout === "settings" ? "grid grid-cols-2 gap-3" : "space-y-2"
+          }
+        >
+          <div
+            className={
+              layout === "settings"
+                ? "min-w-0 space-y-2"
+                : "grid grid-cols-[auto_1fr] items-center gap-3"
+            }
+          >
+            <span className="text-sm text-muted-foreground">系统浅色时</span>
+            <Choices
+              label="系统浅色时的配色"
+              value={theme.systemLightMode ?? "light"}
+              options={[
+                ["light", "浅色"],
+                ["sepia", "纸张"],
+              ]}
+              onChange={(systemLightMode) => setTheme({ systemLightMode })}
+            />
+          </div>
+          <div
+            className={
+              layout === "settings"
+                ? "min-w-0 space-y-2"
+                : "grid grid-cols-[auto_1fr] items-center gap-3"
+            }
+          >
+            <span className="text-sm text-muted-foreground">系统深色时</span>
+            <Choices
+              label="系统深色时的配色"
+              value={theme.systemDarkContrast ?? "soft"}
+              options={[
+                ["soft", "石墨"],
+                ["high", "纯黑"],
+              ]}
+              onChange={(systemDarkContrast) =>
+                setTheme({ systemDarkContrast })
+              }
+            />
+          </div>
         </div>
       )}
     </div>
