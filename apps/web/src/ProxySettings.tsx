@@ -19,9 +19,9 @@ export function ProxySettings({ open }: { open: boolean }) {
   const [port, setPort] = useState("7890");
   const [result, setResult] = useState<ProxyCheckResult>();
   const [error, setError] = useState("");
-  const [operation, setOperation] = useState<
-    "load" | "save" | "check" | "restart" | null
-  >(null);
+  const [operation, setOperation] = useState<"load" | "save" | "check" | null>(
+    null,
+  );
   const pending = operation !== null;
   const revision = useRef(0);
   const applyState = (next: ProxySettingsState) => {
@@ -71,7 +71,7 @@ export function ProxySettings({ open }: { open: boolean }) {
     setResult(undefined);
     setError("");
   };
-  const perform = async (action: "save" | "check" | "restart") => {
+  const perform = async (action: "save" | "check") => {
     const current = revision.current;
     setOperation(action);
     setError("");
@@ -83,13 +83,13 @@ export function ProxySettings({ open }: { open: boolean }) {
         if (current === revision.current) {
           applyState(next);
         }
-      } else if (action === "check") {
+      } else {
         setResult(undefined);
         const next = await desktop.checkProxy!(draft);
         if (current === revision.current) {
           setResult(next);
         }
-      } else await desktop.restart?.();
+      }
     } catch (cause) {
       if (current === revision.current) setError((cause as Error).message);
     } finally {
@@ -102,31 +102,43 @@ export function ProxySettings({ open }: { open: boolean }) {
         <h3 id="proxy-mode-label" className="mb-3 text-sm font-medium">
           代理
         </h3>
-        <Tabs
-          value={mode}
-          onValueChange={(value) => {
-            if (
-              value === "manual" ||
-              value === "system" ||
-              value === "direct"
-            ) {
-              edited();
-              setMode(value);
-            }
-          }}
-        >
-          <TabsList aria-labelledby="proxy-mode-label" className="w-full">
-            {Object.entries(labels).map(([value, label]) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                disabled={pending || !state}
-              >
-                {label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-3">
+          <Tabs
+            className="min-w-0 flex-1"
+            value={mode}
+            onValueChange={(value) => {
+              if (
+                value === "manual" ||
+                value === "system" ||
+                value === "direct"
+              ) {
+                edited();
+                setMode(value);
+              }
+            }}
+          >
+            <TabsList aria-labelledby="proxy-mode-label" className="w-full">
+              {Object.entries(labels).map(([value, label]) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  disabled={pending || !state}
+                >
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <Button
+            variant="outline"
+            className="shrink-0"
+            disabled={pending || !changed}
+            onClick={() => void perform("save")}
+          >
+            {operation === "save" && <LoaderCircle className="animate-spin" />}
+            保存代理设置
+          </Button>
+        </div>
         {mode === "manual" && (
           <div className="mt-3 flex gap-3">
             <label className="min-w-0 flex-1 text-xs text-muted-foreground">
@@ -168,31 +180,17 @@ export function ProxySettings({ open }: { open: boolean }) {
             填写 Clash 的 HTTP 或 Mixed 端口。
           </p>
         )}
-        <div className="mt-3 flex items-center gap-3">
-          <Button
-            variant="outline"
-            disabled={pending || !changed}
-            onClick={() => void perform("save")}
-          >
-            {operation === "save" && <LoaderCircle className="animate-spin" />}
-            保存代理设置
-          </Button>
-          {(state?.restartRequired || mode === "system") && (
-            <Button
-              variant="outline"
-              disabled={pending || changed || !desktop.restart}
-              onClick={() => void perform("restart")}
-            >
-              重启 NeoRead
-            </Button>
-          )}
-        </div>
+
         <p className="mt-2 text-xs text-muted-foreground">
-          {state?.restartRequired
-            ? "代理配置已变化，重启 NeoRead 后生效。"
-            : mode === "system"
-              ? "切换系统代理后，请重启 NeoRead 再检测。"
-              : "修改后需保存并重启 NeoRead。"}
+          {state?.restartRequired ? (
+            "代理配置已变化，重启 NeoRead 后生效。"
+          ) : mode === "system" ? (
+            <strong className="font-semibold">
+              切换系统代理后，请重启 NeoRead 再检测。
+            </strong>
+          ) : (
+            "修改后需保存并重启 NeoRead。"
+          )}
         </p>
         {state?.warning && (
           <p className="mt-2 text-xs text-muted-foreground">{state.warning}</p>
