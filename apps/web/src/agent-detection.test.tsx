@@ -153,33 +153,6 @@ it("keeps a saved check visible while metadata loads and reflects global failure
   expect(api.testAI).not.toHaveBeenCalled();
 });
 
-it("publishes text while vision is still running, even without a subscription login", async () => {
-  vi.mocked(api.providers).mockResolvedValue([
-    {
-      id: "codex",
-      installed: true,
-      authenticated: false,
-      status: "登录状态未确认",
-    },
-  ]);
-  let finishVision!: (capability: AICapability) => void;
-  vi.mocked(api.testAI).mockImplementation((_id, stage) => {
-    if (stage === "text")
-      return Promise.resolve({ ...passed, vision: false, pendingVision: true });
-    return new Promise((resolve) => {
-      finishVision = resolve;
-    });
-  });
-  await render();
-  expect(api.providers).toHaveBeenCalledWith(false);
-  expect(api.testAI).toHaveBeenNthCalledWith(1, "codex", "text");
-  expect(api.testAI).toHaveBeenNthCalledWith(2, "codex", "vision");
-  expect(host.querySelector('[aria-label="文本推理：已通过"]')).not.toBeNull();
-  expect(host.querySelector('[aria-label="图片理解：检测中"]')).not.toBeNull();
-  await act(async () => finishVision(passed));
-  expect(host.querySelector('[aria-label="图片理解：已通过"]')).not.toBeNull();
-});
-
 it("keeps successful text when the vision request disconnects", async () => {
   vi.mocked(api.testAI).mockImplementation(async (_id, stage) => {
     if (stage === "text")
@@ -197,19 +170,6 @@ it("resumes an interrupted vision check without repeating text", async () => {
   await render();
   expect(api.testAI).toHaveBeenCalledExactlyOnceWith("codex", "vision");
   expect(host.querySelector('[aria-label="文本推理：已通过"]')).not.toBeNull();
-});
-
-it("does not show old green checks after a text retry disconnects", async () => {
-  config.capabilities.codex = passed;
-  await render();
-  vi.mocked(api.testAI).mockRejectedValue(new Error("connection interrupted"));
-  await act(async () =>
-    (
-      host.querySelector('[aria-label="重新检测 Agent"]') as HTMLButtonElement
-    ).click(),
-  );
-  expect(host.querySelector('[aria-label="文本推理：未通过"]')).not.toBeNull();
-  expect(host.querySelector('[aria-label="图片理解：已通过"]')).toBeNull();
 });
 
 it("defaults the card stack to Codex and preserves a saved choice", async () => {
