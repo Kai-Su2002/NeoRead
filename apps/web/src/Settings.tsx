@@ -64,6 +64,7 @@ import { CitePluginSettings } from "./cite/CitePluginSettings";
 import { HighlightColorsEditor } from "./HighlightColorsEditor";
 import { ProxySettings } from "./ProxySettings";
 import {
+  libraryMode,
   primaryLibraryMode,
   updateLibraryPreferences,
   useReaderStore,
@@ -190,6 +191,7 @@ export function Settings({
     libraryPreferences,
     documents,
   } = useReaderStore();
+  const currentLibrary = libraryMode(libraryPreferences);
   const paperPreferences =
     useReaderStore((s) => s.libraryPreferences.papers) || {};
   // Run the text check, then the vision check, for an agent or an API model
@@ -685,7 +687,7 @@ export function Settings({
         <DialogHeader>
           <DialogTitle>设置</DialogTitle>
           <DialogDescription className="sr-only">
-            Agent 连接、显示、阅读、诊断与论文库
+            Agent 连接、显示、阅读、诊断与{libraryModes[currentLibrary].label}
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="agent" className="settings-tabs">
@@ -708,7 +710,7 @@ export function Settings({
             </TabsTrigger>
             <TabsTrigger value="papers">
               <Library />
-              论文库
+              {libraryModes[currentLibrary].label}
             </TabsTrigger>
           </TabsList>
           <TabsContent
@@ -1038,65 +1040,75 @@ export function Settings({
             {window.neoreadDesktop?.libraryLocation && (
               <LibraryLocationSettings open={open} />
             )}
-            <CitePluginSettings open={open} />
-            <section>
-              <h3 className="mb-3 text-sm font-medium">显示设置</h3>
-              <label className="flex items-center justify-between gap-4 text-sm">
-                <span>
-                  论文显示作者名字
-                  <span className="block text-xs text-muted-foreground">
-                    在表格和卡片中的标题下方显示
-                  </span>
-                </span>
-                <Switch
-                  aria-label="论文显示作者名字"
-                  checked={paperPreferences.showAuthors !== false}
-                  onCheckedChange={(checked) =>
-                    void updateLibraryPreferences({
-                      papers: { ...paperPreferences, showAuthors: !!checked },
-                    }).catch((e) => toast.error(e.message))
-                  }
-                />
-              </label>
-            </section>
-            <section>
-              <h3 className="mb-3 text-sm font-medium">导入设置</h3>
-              <label className="flex items-center justify-between gap-4 text-sm">
-                <span>
-                  导入 PDF 后自动补全论文信息
-                  <span className="block text-xs text-muted-foreground">
-                    通过文中的 DOI 或 arXiv 编号向 arXiv、Crossref 与 Semantic
-                    Scholar 查询
-                  </span>
-                </span>
-                <Switch
-                  aria-label="导入 PDF 后自动补全论文信息"
-                  checked={paperPreferences.autoLookup !== false}
-                  onCheckedChange={(checked) =>
-                    void updateLibraryPreferences({
-                      papers: { ...paperPreferences, autoLookup: !!checked },
-                    }).catch((e) => toast.error(e.message))
-                  }
-                />
-              </label>
-              <label className="mt-4 flex items-center justify-between gap-4 text-sm">
-                <span>
-                  导入后生成文档概要
-                  <span className="block text-xs text-muted-foreground">
-                    使用已配置的文字模型，单独记录用量；已有文档按需生成。
-                  </span>
-                </span>
-                <Switch
-                  aria-label="导入后生成文档概要"
-                  checked={theme.autoGenerateOverview ?? false}
-                  onCheckedChange={(checked) =>
-                    setTheme({ autoGenerateOverview: !!checked })
-                  }
-                />
-              </label>
-              <AutoTranslationSettings theme={theme} setTheme={setTheme} />
-            </section>
-            <PaperServiceSettings open={open} />
+            {currentLibrary === "papers" && (
+              <>
+                <CitePluginSettings open={open} />
+                <section>
+                  <h3 className="mb-3 text-sm font-medium">显示设置</h3>
+                  <label className="flex items-center justify-between gap-4 text-sm">
+                    <span>
+                      论文显示作者名字
+                      <span className="block text-xs text-muted-foreground">
+                        在表格和卡片中的标题下方显示
+                      </span>
+                    </span>
+                    <Switch
+                      aria-label="论文显示作者名字"
+                      checked={paperPreferences.showAuthors !== false}
+                      onCheckedChange={(checked) =>
+                        void updateLibraryPreferences({
+                          papers: {
+                            ...paperPreferences,
+                            showAuthors: !!checked,
+                          },
+                        }).catch((e) => toast.error(e.message))
+                      }
+                    />
+                  </label>
+                </section>
+                <section>
+                  <h3 className="mb-3 text-sm font-medium">导入设置</h3>
+                  <label className="flex items-center justify-between gap-4 text-sm">
+                    <span>
+                      导入 PDF 后自动补全论文信息
+                      <span className="block text-xs text-muted-foreground">
+                        通过文中的 DOI 或 arXiv 编号向 arXiv、Crossref 与
+                        Semantic Scholar 查询
+                      </span>
+                    </span>
+                    <Switch
+                      aria-label="导入 PDF 后自动补全论文信息"
+                      checked={paperPreferences.autoLookup !== false}
+                      onCheckedChange={(checked) =>
+                        void updateLibraryPreferences({
+                          papers: {
+                            ...paperPreferences,
+                            autoLookup: !!checked,
+                          },
+                        }).catch((e) => toast.error(e.message))
+                      }
+                    />
+                  </label>
+                  <label className="mt-4 flex items-center justify-between gap-4 text-sm">
+                    <span>
+                      导入后生成文档概要
+                      <span className="block text-xs text-muted-foreground">
+                        使用已配置的文字模型，单独记录用量；已有文档按需生成。
+                      </span>
+                    </span>
+                    <Switch
+                      aria-label="导入后生成文档概要"
+                      checked={theme.autoGenerateOverview ?? false}
+                      onCheckedChange={(checked) =>
+                        setTheme({ autoGenerateOverview: !!checked })
+                      }
+                    />
+                  </label>
+                  <AutoTranslationSettings theme={theme} setTheme={setTheme} />
+                </section>
+                <PaperServiceSettings open={open} />
+              </>
+            )}
           </TabsContent>
           <TabsContent value="agent" className="settings-panel" keepMounted>
             <section

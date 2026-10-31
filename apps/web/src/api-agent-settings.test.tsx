@@ -57,13 +57,15 @@ vi.mock("@neoread/ui/components/dialog", () => {
 });
 // These tests cover Agent requests and configuration, not hidden appearance or
 // paper-library panels. Keep the real tabs and the controls exercised below.
+const libraryPanel = vi.hoisted(() => ({ visible: false }));
 vi.mock("@neoread/ui/components/tabs", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@neoread/ui/components/tabs")>();
   return {
     ...actual,
     TabsContent: (props: ComponentProps<typeof actual.TabsContent>) =>
-      props.value === "display" || props.value === "papers" ? null : (
+      props.value === "display" ||
+      (props.value === "papers" && !libraryPanel.visible) ? null : (
         <actual.TabsContent {...props} />
       ),
   };
@@ -420,4 +422,40 @@ it("persists CLI web search directly from the toggle without a Save action", asy
   ).toBe(true);
   expect(useReaderStore.getState().aiConfig?.webSearch?.cliEnabled).toBe(true);
   expect(toggle.getAttribute("aria-checked")).toBe("true");
+});
+
+it("shows only library location in the books tab for the current library", async () => {
+  const previous = useReaderStore.getState().libraryPreferences;
+  libraryPanel.visible = true;
+  useReaderStore.setState({
+    libraryPreferences: { ...previous, mode: "books", primaryMode: "papers" },
+  });
+  window.neoreadDesktop = {
+    libraryLocation: vi.fn(async () => "/test/library"),
+    moveLibrary: vi.fn(),
+    importLibrary: vi.fn(),
+  } as unknown as NonNullable<typeof window.neoreadDesktop>;
+  try {
+    await act(async () =>
+      root.render(<Settings open onOpenChange={() => {}} />),
+    );
+    const tabs = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    expect(tabs.some((tab) => tab.textContent === "论文库")).toBe(false);
+    const books = tabs.find((tab) => tab.textContent === "图书库")!;
+    expect(books).toBeDefined();
+    await act(async () => books.click());
+    const panel = host.querySelector(
+      `[role="tabpanel"][aria-labelledby="${books.id}"]`,
+    )!;
+    expect(panel.textContent).toContain("书库位置");
+    expect(panel.textContent).toContain("/test/library");
+    expect(panel.querySelectorAll("section")).toHaveLength(1);
+    expect(panel.textContent).not.toContain("导入设置");
+    expect(panel.textContent).not.toContain("论文显示作者名字");
+  } finally {
+    libraryPanel.visible = false;
+    await act(async () =>
+      useReaderStore.setState({ libraryPreferences: previous }),
+    );
+  }
 });
